@@ -3,7 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DESK_BY_ID, STATIONS, STATION_AGENT, deskSeat } from '../src/shared/layout.js';
-import { ROOMS } from '../src/shared/departments.js';
+import { MANAGER_BOOTH, ROOMS, ROOM_DOOR, boothWalls } from '../src/shared/departments.js';
+import { kioskCollider } from '../src/client/world/office/kiosk.js';
+import { FLOOR, LOFT, MEETING_ROOM, SPAWN, STAIRS, plantsAt } from '../src/shared/layout.js';
 import { route, walkable } from '../src/shared/nav.js';
 import { planOf } from '../src/shared/maps/index.js';
 import { PROMPTS } from '../src/shared/prompts.js';
@@ -150,3 +152,45 @@ test('a Manager in the middle of a question of its own hears later; a stopped on
   await f.tick();
   assert.equal(f.typed.length, 2);
 });
+
+test("only the board agents' kiosks by the north wall block the floor back to it; the Manager's is just the kiosk", () => {
+  for (const def of STATIONS) {
+    const c = kioskCollider(def);
+    if (def.station === 'manager') {
+      // It used to run all the way back to the north wall: an invisible wall across the room.
+      assert.ok(c.minZ > def.z - 0.5 && c.maxZ < def.z + 1.2, `the Manager's is ${c.minZ.toFixed(2)}..${c.maxZ.toFixed(2)}`);
+      assert.ok(c.maxX - c.minX < 1);
+    } else assert.equal(c.minZ, FLOOR.minZ, `${def.id} goes back to the wall`);
+  }
+  // Walking past in front of the booth, from one side of the room to the other, is open floor.
+  for (const x of [2, 4, 5.5, 7, 8.5]) assert.ok(walkable(x, MANAGER_BOOTH.minZ - 0.7), `open at (${x}, ${(MANAGER_BOOTH.minZ - 0.7).toFixed(1)})`);
+});
+
+test("the Manager's booth is round its kiosk, with room inside, its door toward the room, and clear of everything", () => {
+  const b = MANAGER_BOOTH;
+  const desk = DESK_BY_ID.get(MANAGER_DESK)!;
+  const inside = (x: number, z: number, m = 0) => x > b.minX + m && x < b.maxX - m && z > b.minZ + m && z < b.maxZ - m;
+  assert.ok(inside(desk.x, desk.z, 0.5), 'the kiosk');
+  const stands = deskSeat(desk, 0.55);
+  assert.ok(inside(stands.x, stands.z, 0.3), 'where the Manager stands');
+  const front = { x: desk.x - Math.sin(desk.rotY) * 0.9, z: desk.z - Math.cos(desk.rotY) * 0.9 };
+  assert.ok(inside(front.x, front.z, 0.3) && walkable(front.x, front.z), 'room to stand in front of it');
+  assert.ok(b.doorX - ROOM_DOOR / 2 > b.minX + 0.5 && b.doorX + ROOM_DOOR / 2 < b.maxX - 0.5);
+  // Clear of the meeting room, the loft's posts, the stairs, where people arrive, the plants and the departments.
+  assert.ok(b.maxX < MEETING_ROOM.minX - 1 && b.maxX < LOFT.minX - 1);
+  assert.ok(b.maxZ < STAIRS.minZ - 0.5);
+  assert.ok(!inside(SPAWN.x, SPAWN.z, -0.6), 'not where people arrive');
+  for (const [x, z] of plantsAt(0)) assert.ok(!inside(x, z, -0.5), `the plant at (${x}, ${z})`);
+  for (const r of ROOMS) assert.ok(b.minX > r.maxX + 1 || b.maxX < r.minX - 1 || b.minZ > r.maxZ + 1 || b.maxZ < r.minZ - 1, `${r.dept.name}'s room`);
+  // In through the door, never the glass.
+  const way = route([0, 0], [front.x, front.z]);
+  const glass = boothWalls(0.02);
+  for (let i = 1; i < way.length; i++) {
+    for (let k = 0; k <= 40; k++) {
+      const x = way[i - 1][0] + ((way[i][0] - way[i - 1][0]) * k) / 40;
+      const z = way[i - 1][1] + ((way[i][1] - way[i - 1][1]) * k) / 40;
+      assert.ok(!glass.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1), `the way in goes through the door, not the glass at (${x.toFixed(2)}, ${z.toFixed(2)})`);
+    }
+  }
+});
+
