@@ -2,6 +2,7 @@
  * What the office is drawn on and with: the renderer on its canvas, the scene and its lights, the
  * camera, the office building, the sky and the holiday decorations.
  */
+import { noteGpu } from '../gpu';
 import * as THREE from 'three';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { store } from '../state';
@@ -37,7 +38,10 @@ export interface Stage {
 
 export function makeRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer | null {
   try {
-    return new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // Asking for the fast graphics is only a wish: what it got is for 🖥️ Graphics to say (see gpu.ts).
+    noteGpu(renderer.getContext());
+    return renderer;
   } catch (err) {
     console.error(err);
     return null;

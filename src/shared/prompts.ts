@@ -6,7 +6,7 @@
 
 import { STATION_AGENT, type StationKind } from './layout.js';
 
-export type PromptGroup = 'issues' | 'pulls' | 'queue' | 'repos' | 'asks' | 'stations' | 'meetings' | 'office';
+export type PromptGroup = 'issues' | 'pulls' | 'queue' | 'repos' | 'lessons' | 'asks' | 'stations' | 'meetings' | 'office';
 
 /** The editor's sections, in order. */
 export const PROMPT_GROUPS: Record<PromptGroup, string> = {
@@ -14,6 +14,7 @@ export const PROMPT_GROUPS: Record<PromptGroup, string> = {
   pulls: '🔀 Pull requests board',
   queue: '📋 Task queue',
   repos: '🗂️ Across repositories',
+  lessons: '🎓 Lessons',
   asks: '💬 Questions between workers',
   stations: '🧑‍💼 Board agents',
   meetings: '🤝 Meeting room',
@@ -178,6 +179,25 @@ const DEFS = {
     vars: {},
     optional: true,
     text: "You're in your own git worktree, on a fresh branch made for this task. Commit there, push it, and open the pull request from it.",
+  },
+
+  // --- 🎓 Lessons ---
+  'worker.lessons': {
+    group: 'lessons',
+    label: '🎓 What workers start with',
+    used: "Put ahead of the first task of every worker hired on a floor that has lessons (🎓 Lessons), so it starts with the rules the floor's workers learned before it. Nothing is added while a floor has none.",
+    vars: { lessons: "One line per lesson, as they're listed in 🎓 Lessons" },
+    needs: ['lessons'],
+    optional: true,
+    text: [
+      "Lessons this project's workers have learned, mostly from being corrected. Follow them unless your task says otherwise:",
+      '',
+      '{{lessons}}',
+      '',
+      "When someone corrects how you work in a way that should hold for every task here, not just this one, record it as a lesson for the workers after you: `office-workers lesson add \"…\"` (one short rule). Don't record one-offs about this task.",
+      '',
+      'Your task:',
+    ].join('\n'),
   },
 
   // --- 💬 Questions between workers ---

@@ -19,6 +19,7 @@ import { floorPlan } from './floor-plan';
 import { jail } from './jail';
 import { jukebox } from './jukebox';
 import { leaveOnMerge } from './leave-on-merge';
+import { lessons } from './lessons';
 import { machine } from './machine';
 import { map } from './map';
 import { meeting } from './meeting';
@@ -61,4 +62,5 @@ export const SLICES: readonly Slice[] = [
   team,
   accounts,
   signins,
+  lessons,
 ];

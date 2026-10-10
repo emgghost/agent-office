@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // office-workers: the office's workers, from inside Agent Office: who's at which desk and where their
 // pull requests stand, hiring one, sending some home (their worktrees and branches with them),
-// telling one something, asking one a question and answering one asked of you, and saying which pull request is one's. The office puts it on every worker's PATH and gives each its own address and
+// telling one something, asking one a question and answering one asked of you, saying which pull
+// request is one's, and the floor's lessons (the standing rules every new worker starts with). The
+// office puts it on every worker's PATH and gives each its own address and
 // token in AGENT_OFFICE_HOOK_URL, AGENT_OFFICE_WORKER_ID and AGENT_OFFICE_HOOK_TOKEN; this talks to
 // the /office/workers endpoint with them (src/server/office-workers.ts). `office-workers mcp` is the
 // same as an MCP server on stdio, which the office hands the agents that take one. Plain Node, no
@@ -31,6 +33,10 @@ const USAGE = `Usage:
                                                 desk, from the worker's own branch, or by a Claude
                                                 Code worker running gh pr create
   office-workers pr --none [--worker <name|id>] take that pull request off the worker again
+  office-workers lesson [list] [--json]         the floor's lessons: the standing rules every worker
+                                                hired here starts with
+  office-workers lesson add "<rule>"            record one (or give it on stdin): when someone
+                                                corrects how you work for good, not just this task
   office-workers ask <name|id> [--wait <s>] <<'EOF'
   …the question…                                ask another worker something you can't find out
   EOF                                           yourself (or --question "…"); waits up to 45s
@@ -50,11 +56,22 @@ export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 /** How long the office may take to come back when it's restarting (a dev reload, an upgrade). */
 const RETRY_MS = 6000;
 /** Sending several workers home waits on git for each; hiring may fetch from GitHub first. */
-const TIMEOUT_MS = { list: 15_000, tell: 15_000, pr: 45_000, hire: 90_000, home: 300_000, ask: 60_000, answer: 15_000, questions: 15_000 };
-/** Where each call goes, under /office/workers. */
-const PATHS = { list: '', hire: '', home: '/home', tell: '/tell', pr: '/pr', ask: '/ask', answer: '/ask/answer', questions: '/ask' };
+const TIMEOUT_MS = { list: 15_000, tell: 15_000, pr: 45_000, hire: 90_000, home: 300_000, lessons: 15_000, learn: 15_000, ask: 60_000, answer: 15_000, questions: 15_000 };
+/** Where each call goes on the office's hook server. */
+const PATHS = {
+  list: '/office/workers',
+  hire: '/office/workers',
+  home: '/office/workers/home',
+  tell: '/office/workers/tell',
+  pr: '/office/workers/pr',
+  lessons: '/office/lessons',
+  learn: '/office/lessons',
+  ask: '/office/workers/ask',
+  answer: '/office/workers/ask/answer',
+  questions: '/office/workers/ask',
+};
 /** The calls that only read. */
-const GETS = ['list', 'questions'];
+const GETS = ['list', 'lessons', 'questions'];
 
 /**
  * Reads `--flag value` and `--flag=value` options, and the words that aren't options.
@@ -148,6 +165,20 @@ export function parseArgs(argv) {
     if (words.length) throw new UsageError(`questions takes no arguments (got ${words.join(' ')})`);
     return { cmd: 'questions', json: opts['--json'] === true };
   }
+  // lessons, as in the list of them.
+  if (cmd === 'lesson' || cmd === 'lessons') {
+    const [sub = 'list', ...more] = rest;
+    if (sub === 'list' || sub === 'ls' || sub === '--json') {
+      const { opts, words } = options(sub === '--json' ? rest : more, [], ['--json']);
+      if (words.length) throw new UsageError(`lesson list takes no arguments (got ${words.join(' ')})`);
+      return { cmd: 'lessons', json: opts['--json'] === true };
+    }
+    if (sub === 'add') {
+      const { opts, words } = options(more, [], ['--json']);
+      return { cmd: 'learn', ...(words.length ? { text: words.join(' ') } : {}), json: opts['--json'] === true };
+    }
+    throw new UsageError(`lesson takes list or add (got ${sub}). Taking a lesson off is for people, in 🎓 Lessons`);
+  }
   if (cmd === 'hire') {
     const { opts, words } = options(rest, ['--prompt', '--provider', '--model', '--effort', '--desk', '--issue'], ['--no-worktree', '--json']);
     if (words.length) throw new UsageError(`Unexpected argument: ${words[0]} (give the task on stdin or with --prompt)`);
@@ -189,13 +220,13 @@ export function officeEnv(env) {
 
 /**
  * The HTTP request for one of the office's worker calls.
- * @param {'list' | 'hire' | 'home' | 'tell' | 'pr' | 'ask' | 'answer' | 'questions'} what
+ * @param {'list' | 'hire' | 'home' | 'tell' | 'pr' | 'lessons' | 'learn' | 'ask' | 'answer' | 'questions'} what
  * @param {{ url: string, worker: string, token: string }} office
  * @param {Record<string, unknown>} [body]
  * @returns {{ method: string, url: string, headers: Record<string, string>, body?: string, timeout: number }}
  */
 export function buildRequest(what, office, body) {
-  const url = new URL(`${office.url}/office/workers${PATHS[what]}`);
+  const url = new URL(`${office.url}${PATHS[what]}`);
   url.searchParams.set('worker', office.worker);
   const headers = { authorization: `Bearer ${office.token}` };
   if (GETS.includes(what)) return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] };
@@ -238,7 +269,7 @@ async function send(req, fetchImpl) {
 
 /**
  * Makes one call to the office; resolves to what it answered, or throws with why it said no.
- * @param {'list' | 'hire' | 'home' | 'tell' | 'pr' | 'ask' | 'answer' | 'questions'} what
+ * @param {'list' | 'hire' | 'home' | 'tell' | 'pr' | 'lessons' | 'learn' | 'ask' | 'answer' | 'questions'} what
  * @param {Record<string, unknown> | undefined} body
  * @param {{ env: Record<string, string | undefined>, fetch: typeof fetch }} io
  */
@@ -282,6 +313,19 @@ export function formatHome(answer, merged) {
       return `✓ ${r.worker} went home${r.note ? ` — ${r.note}` : ''}${r.error ? ` — ${r.error}` : ''}`;
     })
     .join('\n');
+}
+
+/** The floor's lessons, a line each. */
+export function formatLessons(answer) {
+  const lessons = answer?.lessons ?? [];
+  if (!lessons.length) return 'This floor has no lessons yet.';
+  return lessons.map((l) => `- ${l.text} (${l.by})`).join('\n');
+}
+
+/** What recording a lesson came to. */
+export function formatLearned(answer) {
+  const text = answer?.lesson?.text ?? '';
+  return answer?.known ? `The floor already has that lesson: “${text}”` : `Recorded: “${text}”. Every worker hired on this floor from now on starts with it.`;
 }
 
 /** Where a question stands: its answer, or that the answer will come by terminal. */
@@ -407,6 +451,30 @@ export const TOOLS = [
     annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
+    name: 'list_lessons',
+    title: 'List lessons',
+    description:
+      "Lists this floor's lessons: the standing rules about how work is done in this project that the office's workers have been taught, mostly by being corrected. " +
+      'Every worker hired on the floor starts with them in its first prompt; a worker hired without one has not seen them, so check them before you start.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'record_lesson',
+    title: 'Record a lesson',
+    description:
+      'Records a lesson for every worker hired on this floor from now on. Use it when someone corrects how you work in a way that should hold for every task in this project, ' +
+      'not just this one ("run npm test before opening a PR", "never edit the generated client in src/api"). Not for one-offs about the task at hand. ' +
+      'One short rule, in the imperative, that makes sense to a worker who knows nothing of this conversation. Saying what a lesson already says adds nothing. People can reword or take any lesson off.',
+    inputSchema: {
+      type: 'object',
+      properties: { text: { type: 'string', description: 'The rule, in a sentence or two (400 characters at most).' } },
+      required: ['text'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
     name: 'ask_worker',
     title: 'Ask a worker',
     description:
@@ -455,6 +523,8 @@ const INSTRUCTIONS =
   "rather than looking for the agents with git, ps or HTTP calls. list_workers says where each one's pull request stands (merged: true means it merged), hire_worker " +
   'puts a new agent to work, send_home sends agents home and deletes their worktrees and branches, tell_worker gives one a prompt, and link_pr says which pull request is a ' +
   "worker's when list_workers does not show it. Everyone in the office sees who did what. " +
+  "The floor also keeps lessons, standing rules every new worker starts with: list_lessons shows them, and when someone corrects how you work in a way that should hold for every " +
+  'task in this project, record_lesson keeps it for the workers after you. ' +
   "When you need something you can't find out yourself (what another worker changed or knows, information only it has), ask_worker asks it and brings the answer back; " +
   'when another worker asks you something, answer it with answer_question. ' +
   'The office-workers command on your PATH does the same from a shell.';
@@ -478,6 +548,8 @@ async function runTool(name, args, io) {
     return { text: `Told ${answer.worker?.name ?? a.worker}.` };
   }
   if (name === 'link_pr') return { text: formatLinked(await call('pr', a, io)) };
+  if (name === 'list_lessons') return { text: formatLessons(await call('lessons', undefined, io)) };
+  if (name === 'record_lesson') return { text: formatLearned(await call('learn', { text: a.text }, io)) };
   if (name === 'ask_worker') return { text: formatAsked(await call('ask', { worker: a.worker, question: a.question }, io)) };
   if (name === 'answer_question') {
     const answer = await call('answer', { id: a.id, answer: a.answer }, io);
@@ -607,6 +679,18 @@ export async function main(argv, io = {}) {
       if (!text) throw new UsageError('The prompt is empty');
       const answer = await call('tell', { worker: cmd.worker, prompt: text }, ctx);
       err(`Told ${answer.worker?.name ?? cmd.worker}.`);
+      return 0;
+    }
+    if (cmd.cmd === 'lessons') {
+      const answer = await call('lessons', undefined, ctx);
+      out(cmd.json ? JSON.stringify(answer.lessons ?? [], null, 2) : formatLessons(answer));
+      return 0;
+    }
+    if (cmd.cmd === 'learn') {
+      const text = (cmd.text ?? (stdin.isTTY ? '' : await readStdin(stdin))).trim();
+      if (!text) throw new UsageError('Say the lesson: office-workers lesson add "…", or give it on stdin');
+      const answer = await call('learn', { text }, ctx);
+      out(cmd.json ? JSON.stringify(answer.lesson, null, 2) : formatLearned(answer));
       return 0;
     }
     if (cmd.cmd === 'ask') {
