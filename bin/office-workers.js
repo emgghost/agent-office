@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // office-workers: the office's workers, from inside Agent Office: who's at which desk and where their
 // pull requests stand, hiring one, sending some home (their worktrees and branches with them),
-// telling one something and saying which pull request is one's. The office puts it on every worker's PATH and gives each its own address and
+// telling one something, asking one a question and answering one asked of you, and saying which pull request is one's. The office puts it on every worker's PATH and gives each its own address and
 // token in AGENT_OFFICE_HOOK_URL, AGENT_OFFICE_WORKER_ID and AGENT_OFFICE_HOOK_TOKEN; this talks to
 // the /office/workers endpoint with them (src/server/office-workers.ts). `office-workers mcp` is the
 // same as an MCP server on stdio, which the office hands the agents that take one. Plain Node, no
@@ -31,6 +31,14 @@ const USAGE = `Usage:
                                                 desk, from the worker's own branch, or by a Claude
                                                 Code worker running gh pr create
   office-workers pr --none [--worker <name|id>] take that pull request off the worker again
+  office-workers ask <name|id> [--wait <s>] <<'EOF'
+  …the question…                                ask another worker something you can't find out
+  EOF                                           yourself (or --question "…"); waits up to 45s
+                                                for the answer, else it's typed into your terminal
+  office-workers answer <id> <<'EOF'            answer a question asked of you (or --answer "…")
+  …the answer…
+  EOF
+  office-workers questions [--json]             the questions asked of you, and the ones you asked
   office-workers mcp                            serve these as MCP tools on stdio`;
 
 /** A mistake in how the command was called: the usage is shown with it. */
@@ -42,9 +50,11 @@ export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 /** How long the office may take to come back when it's restarting (a dev reload, an upgrade). */
 const RETRY_MS = 6000;
 /** Sending several workers home waits on git for each; hiring may fetch from GitHub first. */
-const TIMEOUT_MS = { list: 15_000, tell: 15_000, pr: 45_000, hire: 90_000, home: 300_000 };
+const TIMEOUT_MS = { list: 15_000, tell: 15_000, pr: 45_000, hire: 90_000, home: 300_000, ask: 60_000, answer: 15_000, questions: 15_000 };
 /** Where each call goes, under /office/workers. */
-const PATHS = { list: '', hire: '', home: '/home', tell: '/tell', pr: '/pr' };
+const PATHS = { list: '', hire: '', home: '/home', tell: '/tell', pr: '/pr', ask: '/ask', answer: '/ask/answer', questions: '/ask' };
+/** The calls that only read. */
+const GETS = ['list', 'questions'];
 
 /**
  * Reads `--flag value` and `--flag=value` options, and the words that aren't options.
@@ -116,6 +126,28 @@ export function parseArgs(argv) {
     if (none ? words.length : words.length !== 1) throw new UsageError('pr takes one pull request, its number or URL, or --none to take it off (with --worker <name|id> when the worker isn\'t you)');
     return { cmd: 'pr', ...(none ? { unlink: true } : { pr: words[0] }), ...(opts['--worker'] !== undefined ? { worker: String(opts['--worker']).trim() } : {}), json: opts['--json'] === true };
   }
+  if (cmd === 'ask') {
+    const { opts, words } = options(rest, ['--question', '--wait'], ['--json']);
+    if (words.length !== 1) throw new UsageError('ask takes one worker, its name or id, with the question on stdin or --question "…"');
+    const out = { cmd: 'ask', worker: words[0], json: opts['--json'] === true };
+    if (opts['--question'] !== undefined) out.question = opts['--question'];
+    if (opts['--wait'] !== undefined) {
+      const wait = Number(opts['--wait']);
+      if (!Number.isFinite(wait) || wait < 0) throw new UsageError(`--wait takes seconds, e.g. --wait 30 (got ${opts['--wait']})`);
+      out.wait = wait;
+    }
+    return out;
+  }
+  if (cmd === 'answer') {
+    const { opts, words } = options(rest, ['--answer'], []);
+    if (words.length !== 1) throw new UsageError('answer takes the question\'s id (office-workers questions lists them), with the answer on stdin or --answer "…"');
+    return { cmd: 'answer', id: words[0], ...(opts['--answer'] !== undefined ? { answer: opts['--answer'] } : {}) };
+  }
+  if (cmd === 'questions') {
+    const { opts, words } = options(rest, [], ['--json']);
+    if (words.length) throw new UsageError(`questions takes no arguments (got ${words.join(' ')})`);
+    return { cmd: 'questions', json: opts['--json'] === true };
+  }
   if (cmd === 'hire') {
     const { opts, words } = options(rest, ['--prompt', '--provider', '--model', '--effort', '--desk', '--issue'], ['--no-worktree', '--json']);
     if (words.length) throw new UsageError(`Unexpected argument: ${words[0]} (give the task on stdin or with --prompt)`);
@@ -157,7 +189,7 @@ export function officeEnv(env) {
 
 /**
  * The HTTP request for one of the office's worker calls.
- * @param {'list' | 'hire' | 'home' | 'tell' | 'pr'} what
+ * @param {'list' | 'hire' | 'home' | 'tell' | 'pr' | 'ask' | 'answer' | 'questions'} what
  * @param {{ url: string, worker: string, token: string }} office
  * @param {Record<string, unknown>} [body]
  * @returns {{ method: string, url: string, headers: Record<string, string>, body?: string, timeout: number }}
@@ -166,7 +198,7 @@ export function buildRequest(what, office, body) {
   const url = new URL(`${office.url}/office/workers${PATHS[what]}`);
   url.searchParams.set('worker', office.worker);
   const headers = { authorization: `Bearer ${office.token}` };
-  if (what === 'list') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS.list };
+  if (GETS.includes(what)) return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] };
   return { method: 'POST', url: url.href, headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}), timeout: TIMEOUT_MS[what] };
 }
 
@@ -206,7 +238,7 @@ async function send(req, fetchImpl) {
 
 /**
  * Makes one call to the office; resolves to what it answered, or throws with why it said no.
- * @param {'list' | 'hire' | 'home' | 'tell' | 'pr'} what
+ * @param {'list' | 'hire' | 'home' | 'tell' | 'pr' | 'ask' | 'answer' | 'questions'} what
  * @param {Record<string, unknown> | undefined} body
  * @param {{ env: Record<string, string | undefined>, fetch: typeof fetch }} io
  */
@@ -250,6 +282,22 @@ export function formatHome(answer, merged) {
       return `✓ ${r.worker} went home${r.note ? ` — ${r.note}` : ''}${r.error ? ` — ${r.error}` : ''}`;
     })
     .join('\n');
+}
+
+/** Where a question stands: its answer, or that the answer will come by terminal. */
+export function formatAsked(answer) {
+  const q = answer?.question ?? {};
+  if (q.status === 'answered') return `${q.to} answered (question ${q.id}):\n\n${q.answer}`;
+  if (q.status === 'gone') return `${q.to} went home without answering question ${q.id}.`;
+  return `Asked ${q.to} (question ${q.id}); no answer yet. When it answers, the answer is typed into your terminal as your next message: carry on with what doesn't need it meanwhile.`;
+}
+
+/** The questions asked of a worker and by it. */
+export function formatQuestions(view) {
+  const line = (q, who) => `${q.id}  ${who} · ${q.status}: “${q.question.replace(/\s+/g, ' ').slice(0, 100)}”${q.answer ? `\n      ↳ ${q.answer.replace(/\s+/g, ' ').slice(0, 160)}` : ''}`;
+  const of = (view?.askedOfYou ?? []).map((q) => line(q, `from ${q.from}`));
+  const by = (view?.askedByYou ?? []).map((q) => line(q, `to ${q.to}`));
+  return [`Asked of you${of.length ? '' : ': none'}`, ...of, `Asked by you${by.length ? '' : ': none'}`, ...by].join('\n');
 }
 
 /** Whose pull request is whose now, after `pr` said so. */
@@ -358,6 +406,47 @@ export const TOOLS = [
     },
     annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
+  {
+    name: 'ask_worker',
+    title: 'Ask a worker',
+    description:
+      "Asks another worker in this office a question, when you need to know something you can't find out yourself: what another worker changed or decided, " +
+      "how something in its part works, information only it has access to. The office types the question into that worker's terminal once it's free (it carries on with its own task after answering). " +
+      "Waits up to 45 seconds for the answer; when it comes later, it's typed into your terminal as your next message, so carry on with what doesn't need it. " +
+      WORKER_NOTE,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        worker: { type: 'string', description: 'Who to ask, by name or id.' },
+        question: { type: 'string', description: 'The question, complete on its own: the other worker knows nothing of your task.' },
+      },
+      required: ['worker', 'question'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: 'answer_question',
+    title: 'Answer a question',
+    description: 'Answers a question another worker asked you (its id is in the message that asked it, e.g. q3f9a1c). The answer goes straight back to the worker that asked.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: "The question's id." },
+        answer: { type: 'string', description: "Your answer: short and concrete. If you can't answer it, say so and who might." },
+      },
+      required: ['id', 'answer'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: 'list_questions',
+    title: 'List questions',
+    description: 'Lists the questions other workers asked you (answered or not) and the ones you asked, with their answers.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
 ];
 
 const INSTRUCTIONS =
@@ -366,6 +455,8 @@ const INSTRUCTIONS =
   "rather than looking for the agents with git, ps or HTTP calls. list_workers says where each one's pull request stands (merged: true means it merged), hire_worker " +
   'puts a new agent to work, send_home sends agents home and deletes their worktrees and branches, tell_worker gives one a prompt, and link_pr says which pull request is a ' +
   "worker's when list_workers does not show it. Everyone in the office sees who did what. " +
+  "When you need something you can't find out yourself (what another worker changed or knows, information only it has), ask_worker asks it and brings the answer back; " +
+  'when another worker asks you something, answer it with answer_question. ' +
   'The office-workers command on your PATH does the same from a shell.';
 
 /** Runs a tool; resolves to its text, and whether nothing it was asked came off, or throws with why it failed. */
@@ -387,6 +478,12 @@ async function runTool(name, args, io) {
     return { text: `Told ${answer.worker?.name ?? a.worker}.` };
   }
   if (name === 'link_pr') return { text: formatLinked(await call('pr', a, io)) };
+  if (name === 'ask_worker') return { text: formatAsked(await call('ask', { worker: a.worker, question: a.question }, io)) };
+  if (name === 'answer_question') {
+    const answer = await call('answer', { id: a.id, answer: a.answer }, io);
+    return { text: `Answered ${answer.question?.from ?? ''} (question ${answer.question?.id ?? a.id}).` };
+  }
+  if (name === 'list_questions') return { text: formatQuestions(await call('questions', undefined, io)) };
   throw new Error(`Unknown tool: ${name}`);
 }
 
@@ -510,6 +607,25 @@ export async function main(argv, io = {}) {
       if (!text) throw new UsageError('The prompt is empty');
       const answer = await call('tell', { worker: cmd.worker, prompt: text }, ctx);
       err(`Told ${answer.worker?.name ?? cmd.worker}.`);
+      return 0;
+    }
+    if (cmd.cmd === 'ask') {
+      const question = (cmd.question !== undefined ? String(cmd.question) : stdin.isTTY ? '' : await readStdin(stdin)).trim();
+      if (!question) throw new UsageError(`Give the question on stdin (office-workers ask ${cmd.worker} <<'EOF' … EOF) or with --question "…"`);
+      const answer = await call('ask', { worker: cmd.worker, question, ...(cmd.wait !== undefined ? { wait: cmd.wait } : {}) }, ctx);
+      out(cmd.json ? JSON.stringify(answer.question, null, 2) : formatAsked(answer));
+      return 0;
+    }
+    if (cmd.cmd === 'answer') {
+      const text = (cmd.answer !== undefined ? String(cmd.answer) : stdin.isTTY ? '' : await readStdin(stdin)).trim();
+      if (!text) throw new UsageError(`Give the answer on stdin (office-workers answer ${cmd.id} <<'EOF' … EOF) or with --answer "…"`);
+      const answer = await call('answer', { id: cmd.id, answer: text }, ctx);
+      err(`Answered ${answer.question?.from ?? ''} (question ${answer.question?.id ?? cmd.id}).`);
+      return 0;
+    }
+    if (cmd.cmd === 'questions') {
+      const view = await call('questions', undefined, ctx);
+      out(cmd.json ? JSON.stringify(view, null, 2) : formatQuestions(view));
       return 0;
     }
     if (cmd.cmd === 'pr') {
