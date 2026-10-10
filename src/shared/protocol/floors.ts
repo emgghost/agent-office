@@ -2,6 +2,7 @@
 
 import type { CabinetView } from '../cabinet.js';
 import type { Decoration } from '../decor.js';
+import type { LessonsState } from '../lessons.js';
 import type { DogState } from '../dog.js';
 import type { FloorPlan } from '../floorplan.js';
 import type { CarState } from '../garage.js';
@@ -124,6 +125,8 @@ export interface FloorView {
   cars: CarState[];
   /** Workers sent home and locked up in the dungeon, on a map that has one. */
   jail: JailState;
+  /** The standing rules this floor's workers have learned, which every new one starts with. */
+  lessons: LessonsState;
 }
 
 export type FloorClientMsg =
