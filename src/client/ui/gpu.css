@@ -1,0 +1,17 @@
+/* 🖥️ Graphics (ui/gpu.ts) */
+.gpu .body > p { margin: 10px 0 0; line-height: 1.4; }
+.gpu-now { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; }
+.gpu-now.discrete { background: #e3fbf3; }
+.gpu-now.integrated { background: #fff6d8; }
+.gpu-now.software { background: #ffe3ea; }
+.gpu-badge { font-weight: 900; white-space: nowrap; }
+.gpu-name { font: 700 14px ui-monospace, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.gpu-steps { margin-top: 14px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper-2); }
+.gpu-steps h3 { margin: 0 0 6px; font-size: 15px; }
+.gpu-steps ol { margin: 0; padding-left: 20px; line-height: 1.45; }
+.gpu-steps li + li { margin-top: 4px; }
+.gpu-steps code { font-size: 12px; overflow-wrap: anywhere; }
+.gpu-steps .note { margin: 8px 0 0; }
+.gpu-addr { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.gpu-addr .btn { padding: 2px 8px; font-size: 12px; }
+.lite-offer .gpu-line { margin: -4px 0 12px; font-weight: 700; font-size: 13px; }
