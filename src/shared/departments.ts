@@ -5,7 +5,7 @@
 // The rooms are only built on the office's own map (features/departments/world.ts); on the others the
 // desks still belong to their departments.
 
-import { DESKS, DESK_SIZE, deskSeat, type DeskDef } from './layout.js';
+import { DESKS, DESK_SIZE, STATIONS, deskSeat, type DeskDef } from './layout.js';
 
 export const DEPARTMENT_IDS = ['security', 'qa', 'backend', 'frontend', 'po', 'pm', 'design', 'scrum'] as const;
 export type DepartmentId = (typeof DEPARTMENT_IDS)[number];
@@ -124,3 +124,34 @@ export function roomWalls(r: RoomDef, t = 0.1): [number, number, number, number]
     [r.minX, r.maxX, r.spineZ - t / 2, r.spineZ + t / 2],
   ];
 }
+
+// ---- The Manager's booth ------------------------------------------------------------------------
+
+/**
+ * The Manager's own glass booth, round its kiosk (station-manager in layout.ts): the kiosk in the
+ * middle of its back half with the Manager standing behind it, room to stand in front of it, and the
+ * door in the wall the kiosk faces, toward the room. Framed in the Manager's gold.
+ */
+export const MANAGER_BOOTH = (() => {
+  const k = STATIONS.find((s) => s.station === 'manager')!;
+  // The kiosk faces -z at rotY 0 (see deskPoint): its front, where you stand, is toward minZ.
+  const box = { minX: k.x - 1.6, maxX: k.x + 1.6, minZ: k.z - 1.6, maxZ: k.z + 1.3 };
+  // A potted plant in each back corner.
+  const plants: readonly (readonly [number, number])[] = [[box.minX + 0.4, box.maxZ - 0.4], [box.maxX - 0.4, box.maxZ - 0.4]];
+  // Lower than the departments' glass, so the Manager's name tag and card stand clear above it.
+  return { ...box, doorX: k.x, height: 2, color: '#ffb703', floor: '#fff1c1', plants } as const;
+})();
+
+/** The booth's walls as thin rectangles, its door left open: what the dog and the workers walking about steer round. */
+export function boothWalls(t = 0.1): [number, number, number, number][] {
+  const b = MANAGER_BOOTH;
+  const half = ROOM_DOOR / 2;
+  return [
+    [b.minX - t / 2, b.minX + t / 2, b.minZ, b.maxZ],
+    [b.maxX - t / 2, b.maxX + t / 2, b.minZ, b.maxZ],
+    [b.minX, b.maxX, b.maxZ - t / 2, b.maxZ + t / 2],
+    [b.minX, b.doorX - half, b.minZ - t / 2, b.minZ + t / 2],
+    [b.doorX + half, b.maxX, b.minZ - t / 2, b.minZ + t / 2],
+  ];
+}
+

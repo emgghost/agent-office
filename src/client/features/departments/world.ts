@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { ROOMS, ROOM_DOOR, ROOM_HEIGHT, roomDoor, roomKit, type DepartmentId, type RoomDef } from '../../../shared/departments';
+import { MANAGER_BOOTH, ROOMS, ROOM_DOOR, ROOM_HEIGHT, roomDoor, roomKit, type DepartmentId, type RoomDef } from '../../../shared/departments';
 import { canvasTexture } from '../../world/texture';
 import { mesh, roundedBox, textPlane, toon } from '../../world/toon';
 import type { Fixture, Site } from '../../world/office/fixture';
 import { PALETTE, box, glassPane } from '../../world/office/materials';
+import { floorPlant, plant } from '../../world/office/props';
 
 // The departments' rooms (shared/departments.ts): glass walls framed in each department's color round
 // its row of two desks, with a door behind the chairs that slides open as anyone comes up to it, its
@@ -11,8 +12,8 @@ import { PALETTE, box, glassPane } from '../../world/office/materials';
 
 const T = 0.08;
 
-/** A run of glass from (x0, z0) to (x1, z1), one axis held, in panes about 1.4 wide, framed in `frame`, and what's in its way. */
-function glassRun(site: Site, frame: THREE.Material, x0: number, z0: number, x1: number, z1: number) {
+/** A run of glass `H` high from (x0, z0) to (x1, z1), one axis held, in panes about 1.4 wide, framed in `frame`, and what's in its way. */
+function glassRun(site: Site, frame: THREE.Material, x0: number, z0: number, x1: number, z1: number, H = ROOM_HEIGHT) {
   const alongX = z0 === z1;
   const len = alongX ? x1 - x0 : z1 - z0;
   if (len <= 0.05) return;
@@ -20,30 +21,29 @@ function glassRun(site: Site, frame: THREE.Material, x0: number, z0: number, x1:
   const g = new THREE.Group();
   const bar = (w: number, h: number, d: number, x: number, y: number, z: number) => g.add(mesh(box(w, h, d), frame, x, y, z, false));
   for (let i = 0; i < n; i++) {
-    const pane = glassPane(len / n - 0.04, ROOM_HEIGHT - 0.16);
+    const pane = glassPane(len / n - 0.04, H - 0.16);
     const u = (i + 0.5) * (len / n);
-    pane.position.set(alongX ? x0 + u : x0, ROOM_HEIGHT / 2, alongX ? z0 : z0 + u);
+    pane.position.set(alongX ? x0 + u : x0, H / 2, alongX ? z0 : z0 + u);
     if (!alongX) pane.rotation.y = Math.PI / 2;
     g.add(pane);
   }
   for (let i = 0; i <= n; i++) {
     const u = i * (len / n);
-    if (alongX) bar(0.07, ROOM_HEIGHT, T + 0.04, x0 + u, ROOM_HEIGHT / 2, z0);
-    else bar(T + 0.04, ROOM_HEIGHT, 0.07, x0, ROOM_HEIGHT / 2, z0 + u);
+    if (alongX) bar(0.07, H, T + 0.04, x0 + u, H / 2, z0);
+    else bar(T + 0.04, H, 0.07, x0, H / 2, z0 + u);
   }
-  for (const y of [0.04, ROOM_HEIGHT - 0.05]) {
+  for (const y of [0.04, H - 0.05]) {
     if (alongX) bar(len, 0.09, T + 0.06, x0 + len / 2, y, z0);
     else bar(T + 0.06, 0.09, len, x0, y, z0 + len / 2);
   }
   site.group.add(g);
-  site.colliders.push(alongX ? { minX: x0, maxX: x1, minZ: z0 - T / 2, maxZ: z0 + T / 2, top: ROOM_HEIGHT, fence: true } : { minX: x0 - T / 2, maxX: x0 + T / 2, minZ: z0, maxZ: z1, top: ROOM_HEIGHT, fence: true });
+  site.colliders.push(alongX ? { minX: x0, maxX: x1, minZ: z0 - T / 2, maxZ: z0 + T / 2, top: H, fence: true } : { minX: x0 - T / 2, maxX: x0 + T / 2, minZ: z0, maxZ: z1, top: H, fence: true });
 }
 
-/** The door: two glass leaves that slide apart over the glass either side, as the meeting room's do. */
-function door(site: Site, r: RoomDef, frame: THREE.Material) {
-  const { x: dx, z } = roomDoor(r);
+/** A door at (dx, z) in a wall `H` high along x, `out` the way out of it: two glass leaves that slide apart over the glass either side, as the meeting room's do. */
+function door(site: Site, dx: number, z: number, out: 1 | -1, frame: THREE.Material, H = ROOM_HEIGHT) {
   const half = ROOM_DOOR / 2;
-  const h = 2.2;
+  const h = Math.min(2.2, H - 0.15);
   const leaves: [THREE.Group, number][] = [];
   for (const side of [-1, 1]) {
     const leaf = new THREE.Group();
@@ -55,12 +55,12 @@ function door(site: Site, r: RoomDef, frame: THREE.Material) {
     leaf.add(mesh(box(0.03, 0.36, 0.07), toon(PALETTE.ink), -side * (half / 2 - 0.1), 1.05, 0, false));
     const x0 = dx + (side * half) / 2;
     // Outside the glass, so it slides across in front of it.
-    leaf.position.set(x0, 0, z + r.out * (T / 2 + 0.04));
+    leaf.position.set(x0, 0, z + out * (T / 2 + 0.04));
     site.group.add(leaf);
     leaves.push([leaf, x0]);
   }
   // Over the doorway, up to the top of the glass.
-  site.group.add(mesh(box(ROOM_DOOR, ROOM_HEIGHT - h, T + 0.04), frame, dx, (ROOM_HEIGHT + h) / 2, z, false));
+  site.group.add(mesh(box(ROOM_DOOR, H - h, T + 0.04), frame, dx, (H + h) / 2, z, false));
   site.doors.push({
     x: dx,
     y: 0,
@@ -238,7 +238,7 @@ function room(site: Site, r: RoomDef) {
   glassRun(site, frame, r.minX, r.doorZ, dx - ROOM_DOOR / 2, r.doorZ);
   glassRun(site, frame, dx + ROOM_DOOR / 2, r.doorZ, r.maxX, r.doorZ);
   if (r.out < 0) glassRun(site, toon('#ffffff'), r.minX, r.spineZ, r.maxX, r.spineZ);
-  door(site, r, frame);
+  door(site, dx, r.doorZ, r.out, frame);
   // Its name over the door, outside and in.
   for (const side of [1, -1]) {
     const label = textPlane(`${r.dept.emoji} ${r.dept.name}`, { bg: r.dept.color, color: '#ffffff', size: 56, border: '#ffffff' });
@@ -261,3 +261,38 @@ export const departmentRooms: Fixture = (site) => {
   for (const r of ROOMS) room(site, r);
   return {};
 };
+
+/**
+ * The Manager's booth round its kiosk (see MANAGER_BOOTH): gold-framed glass, low enough that the
+ * Manager's name tag and the card over its head stand clear above it, its door toward the room, its
+ * own floor, its name on the glass beside the door, and a tall plant in each back corner.
+ */
+export const managerBooth: Fixture = (site) => {
+  const b = MANAGER_BOOTH;
+  const frame = toon(b.color);
+  site.group.add(mesh(roundedBox(b.maxX - b.minX - 0.12, 0.012, b.maxZ - b.minZ - 0.12, 0.25), toon(b.floor), (b.minX + b.maxX) / 2, 0.016, (b.minZ + b.maxZ) / 2, false));
+  const H = b.height;
+  glassRun(site, frame, b.minX, b.minZ, b.minX, b.maxZ, H);
+  glassRun(site, frame, b.maxX, b.minZ, b.maxX, b.maxZ, H);
+  glassRun(site, frame, b.minX, b.maxZ, b.maxX, b.maxZ, H);
+  glassRun(site, frame, b.minX, b.minZ, b.doorX - ROOM_DOOR / 2, b.minZ, H);
+  glassRun(site, frame, b.doorX + ROOM_DOOR / 2, b.minZ, b.maxX, b.minZ, H);
+  door(site, b.doorX, b.minZ, -1, frame, H);
+  // On the glass west of the door (on your right as you come up to it), outside and in.
+  const signX = (b.minX + b.doorX - ROOM_DOOR / 2) / 2;
+  for (const side of [-1, 1]) {
+    const label = textPlane('💼 Manager', { bg: b.color, color: '#2b2d42', size: 56, border: '#ffffff' });
+    label.scale.multiplyScalar(0.36);
+    label.position.set(signX, 1.55, b.minZ + side * (T / 2 + 0.03));
+    label.rotation.y = side > 0 ? 0 : Math.PI;
+    site.group.add(label);
+  }
+  b.plants.forEach(([x, z], i) => {
+    const p = plant(floorPlant(i + 1), 0.9);
+    p.position.set(x, 0, z);
+    site.group.add(p);
+    site.colliders.push({ minX: x - 0.27, maxX: x + 0.27, minZ: z - 0.27, maxZ: z + 0.27, top: 0.45 });
+  });
+  return {};
+};
+

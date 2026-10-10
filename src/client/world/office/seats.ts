@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { BEANBAGS, DESKS, DESK_SIZE, FLOOR, KIOSK, SEATING_BY_ID, STATIONS, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../../shared/layout';
+import { BEANBAGS, DESKS, DESK_SIZE, KIOSK, SEATING_BY_ID, STATIONS, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../../shared/layout';
 import { deskPoint } from '../../../shared/nav';
 import { mesh, roundedBox, textPlane, toon } from '../toon';
 import type { Collider, DeskView, Interactable } from '../types';
 import type { Fixture } from './fixture';
+import { againstWall, kioskCollider } from './kiosk';
 import { PALETTE, box } from './materials';
 import { deskBooks, deskMug, plant } from './props';
 
@@ -280,19 +281,14 @@ export const kiosks: Fixture = (site) => {
     const view = buildKiosk(def);
     site.group.add(view.group);
     site.desks.set(def.id, view);
-    // The kiosk and the agent behind it, back to the wall (they all stand by the north wall) so
-    // nobody squeezes in behind, and up over the agent's head so nobody hops on it.
-    const corners = [-1, 1].flatMap((t) => [-KIOSK.depth / 2, KIOSK.stand + 0.35].map((sz) => deskPoint(def, (t * KIOSK.width) / 2, sz)));
-    const xs = corners.map(([x]) => x);
-    const zs = corners.map(([, z]) => z);
-    site.colliders.push({ minX: Math.min(...xs), maxX: Math.max(...xs), minZ: FLOOR.minZ, maxZ: Math.max(...zs), top: 1.5, fence: true });
+    site.colliders.push(kioskCollider(def));
     // Walk up to its front.
     const [fx, fz] = deskPoint(def, 0, -1);
     const it: Interactable = { kind: 'station', deskId: def.id, x: fx, z: fz, radius: 1.3 };
     site.interactables.push(it);
     view.group.userData.interact = it;
     // The agent, its name tag and the card over its head, up against the wall.
-    site.wall('north', def.x, 1.45, 1.4, 2.9);
+    if (againstWall(def)) site.wall('north', def.x, 1.45, 1.4, 2.9);
   }
   return {};
 };
