@@ -71,6 +71,8 @@ export class WorkerManager {
   private saveTimer: NodeJS.Timeout;
   /** How many rows the floor's back office is built out: its desks past that aren't there to hire at (see WING). */
   wing: () => number = () => 0;
+  /** A new agent's first prompt as it's sent: with its floor's lessons ahead of it (see lessons.ts). */
+  brief: (prompt: string) => string = (prompt) => prompt;
 
   constructor(
     private dir: string,
@@ -255,7 +257,7 @@ export class WorkerManager {
     let others: WorkerRepo[] | undefined;
     if (worktree) {
       const slug = `${name.toLowerCase()}-${id.slice(0, 4)}`;
-      const made = repos.length ? this.makeWorkspace(slug, repos) : this.trees.create(slug);
+      const made = repos.length ? this.worktrees.makeWorkspace(slug, repos) : this.trees.create(slug);
       if (typeof made === 'string') return made;
       if ('repos' in made) {
         ({ worktree: wt, repos: others } = made);
@@ -294,15 +296,12 @@ export class WorkerManager {
     w.owner = owner;
     this.workers.set(id, w);
     if (info.prompt) this.tasks.notePrompt(w, info.prompt);
-    // A board agent is told what it's there for ahead of its first request (which is what shows).
-    this.launch(w, seat.station && info.prompt ? `${stationBrief(seat.station, this.prompts)}\n\n${info.prompt}` : info.prompt, undefined);
+    // A board agent is told what it's there for ahead of its first request (which is what shows), and
+    // every agent but a meeting's what its floor has learned ahead of that.
+    const first = seat.station && info.prompt ? `${stationBrief(seat.station, this.prompts)}\n\n${info.prompt}` : info.prompt;
+    this.launch(w, first && !meeting ? this.brief(first) : first, undefined);
     this.persist();
     return info;
-  }
-
-  /** The workspace of a worker across repositories (see WorkerTrees.makeWorkspace). */
-  private makeWorkspace(slug: string, repos: RepoSource[]): { worktree: NonNullable<WorkerInfo['worktree']>; repos: WorkerRepo[]; notes: string[] } | string {
-    return this.worktrees.makeWorkspace(slug, repos);
   }
 
   /** Starts a worker that isn't running again, carrying on its session, with `prompt` as its next message. */
