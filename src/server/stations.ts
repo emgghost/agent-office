@@ -10,5 +10,5 @@ export function stationBrief(kind: StationKind, prompts?: PromptSource): string 
   return officePrompt(prompts, `station.${kind}`);
 }
 
-/** Claude Code tools the queue agent is launched without, so it can't edit the checkout even by mistake. */
+/** Claude Code tools the queue agent and the manager are launched without, so they can't edit the checkout even by mistake. */
 export const QUEUE_AGENT_DISALLOWED_TOOLS = ['Edit', 'Write', 'NotebookEdit'];

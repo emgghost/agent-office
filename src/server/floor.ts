@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { ChangesState, FloorInfo, PeerInfo, ProjectInfo, ServerMsg, WorkerInfo } from '../shared/protocol.js';
-import { isBusy } from '../shared/status.js';
+import { isBusy, workerPr } from '../shared/status.js';
 import { DESK_BY_ID } from '../shared/layout.js';
 import type { FloorDef } from './building.js';
 import { excludeFromGit } from './config.js';
@@ -14,6 +14,7 @@ import { TaskQueue } from './queue.js';
 import { Changes } from './changes.js';
 import { Decor } from './decor.js';
 import { Asks } from './asks.js';
+import { ManagerReports } from './manager.js';
 import { Lessons } from './lessons.js';
 import { firstPrompt } from './departments.js';
 import { FloorPlanStore } from './floorplan.js';
@@ -122,6 +123,8 @@ export class Floor {
   readonly decor: Decor;
   /** Questions its workers ask one another, on their way between terminals. */
   readonly asks: Asks;
+  /** What the Manager hears about the workers it hired. */
+  readonly reports: ManagerReports;
   /** What its workers have learned, which every new one starts with. */
   readonly lessons: Lessons;
   /** The signs over its desks, and how far its back office is built out. */
@@ -188,6 +191,7 @@ export class Floor {
           this.meetings?.onWorker(worker);
           this.dog.onWorker(worker);
           this.asks?.onWorker(worker);
+          this.reports?.onWorker(worker);
           ctx.workerChanged(this, worker);
           // Its turn ended, or whoever had its terminal open closed it: it may be free to go now.
           this.sendLandedHome();
@@ -203,6 +207,7 @@ export class Floor {
           this.meetings?.onWorkerGone(workerId);
           this.dog.onWorkerGone(workerId);
           this.asks?.onWorkerGone(workerId);
+          this.reports?.onWorkerGone(workerId);
           ctx.workerChanged(this, workerId);
         },
         data: (workerId, data, viewers) => ctx.termData(workerId, data, viewers),
@@ -217,6 +222,10 @@ export class Floor {
     );
     this.workers.wing = () => this.plan.wing;
     this.asks = new Asks(this.workers, ctx.prompts, (text) => ctx.toast(this, text));
+    this.reports = new ManagerReports(this.workers, ctx.prompts, (w) => {
+      const pr = workerPr(w, this.github?.pulls.items ?? [], this.queue?.state().tasks ?? []);
+      return pr && `PR #${pr.number} is ${pr.state}`;
+    });
     // Its department's role first, then what the floor has learned, then the task.
     this.workers.brief = firstPrompt(this.lessons, ctx.prompts);
 
@@ -426,6 +435,7 @@ export class Floor {
     clearInterval(this.timer);
     clearTimeout(this.landedTimer);
     this.dog.stop();
+    this.reports.stop();
     this.github.stop();
     this.queue.shutdown();
     this.meetings.shutdown();

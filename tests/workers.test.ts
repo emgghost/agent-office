@@ -1109,7 +1109,7 @@ test('a worker nobody picked a model for starts on the office default, and a boa
   assert.equal(own.args.includes('--model'), false);
 });
 
-test('the queue agent is launched without file-editing tools, and board agents get office-queue on their PATH', async (t) => {
+test('the queue agent and the manager are launched without file-editing tools, and board agents get office-queue on their PATH', async (t) => {
   const f = fixture();
   const updates: WorkerInfo[] = [];
   isolateProviderEnvironment(f, t);
@@ -1169,6 +1169,16 @@ test('the queue agent is launched without file-editing tools, and board agents g
   assert.ok(onPath(pullsLaunch));
   assert.equal(denied(deskLaunch.args), undefined);
   assert.ok(onPath(deskLaunch), 'office-workers is first on a desk worker\'s PATH');
+
+  // The Manager runs the office through its workers: it doesn't edit anything itself either, and starts with its brief.
+  const boss = workers.station('station-manager', 'Ada', 'Add password reset by email');
+  assert.ok(typeof boss === 'object');
+  if (typeof boss !== 'object') return;
+  assert.equal(boss.info.name, 'Manager');
+  const [bossLaunch] = await waitFor(() => launches(boss.info.id), (l) => l.length === 1);
+  assert.deepEqual(denied(bossLaunch.args), ['Edit', 'Write', 'NotebookEdit']);
+  assert.match(bossLaunch.args.at(-1)!, /^You're the Manager of this software company's office/);
+  assert.ok(bossLaunch.args.at(-1)!.endsWith('The request:\n\nAdd password reset by email'));
 });
 
 test("every Claude worker gets the office's MCP server, and office-workers on its PATH", async (t) => {

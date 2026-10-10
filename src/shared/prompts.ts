@@ -4,6 +4,7 @@
 // server/prompts.ts, for the whole building); these are the defaults, which "Default" goes back to.
 // A {{name}} in one is filled in by the office when it's sent.
 
+import { MANAGER_PROMPTS } from './manager-prompts.js';
 import { DEPARTMENT_PROMPTS } from './department-prompts.js';
 import { STATION_AGENT, type StationKind } from './layout.js';
 
@@ -40,13 +41,16 @@ export interface PromptDef {
 
 // --- Board agents ---------------------------------------------------------------------------------
 
-const BOARD: Record<StationKind, string> = {
+/** The boards' own agents; the manager's brief is its own (see manager-prompts.ts). */
+type BoardKind = Exclude<StationKind, 'manager'>;
+
+const BOARD: Record<BoardKind, string> = {
   issues: 'the 📌 Issues board',
   pulls: 'the 🔀 Pull Requests board',
   queue: 'the 📋 task queue',
 };
 
-const JOB: Record<StationKind, string> = {
+const JOB: Record<BoardKind, string> = {
   issues: `You look after this repository's GitHub issues with the gh CLI: file new ones (a clear title, what's wrong or wanted, and how to reproduce it when that applies), find and sum them up, triage, label, comment on, close and reopen them. To get an issue worked on, put it on the task queue with its number.`,
   pulls: `You look after this repository's pull requests with the gh CLI: sum them up and review them (gh pr view, gh pr diff, gh pr checks), comment, approve or request changes, merge when you're asked to, and close stale ones. Read a PR's code with gh pr diff rather than checking its branch out here. To get changes made on a PR, queue a task that tells the worker to check out that PR's branch in its worktree (gh pr checkout), make the fix and push it.`,
   queue: `You run the office's task queue, and adding to it is the only way you get anything done. Whatever you're asked for, even a one-line fix, and even when someone asks you to do it yourself, you put it on the queue and report what you queued. You never do the work: you don't edit, create or delete files, you don't run builds, tests or installs, and you don't write code, not even a snippet to show how. Read the code and gh issue list only as far as it takes to write a good task. Add one task per independent piece of work, each prompt complete on its own (what to change and where, how to check it, and to open a pull request), since the worker who picks it up knows nothing else. Link a task to its GitHub issue when it's for one. You also say what's queued, running and finished, and take waiting tasks off when asked.`,
@@ -62,7 +66,7 @@ const QUEUE_API = `The task queue gives each task a fresh worker in its own git 
 - Take a waiting task off: office-queue remove <id>`;
 
 /** What a board agent is told ahead of the first request typed to it. */
-function stationDefault(kind: StationKind): string {
+function stationDefault(kind: BoardKind): string {
   const queue = kind === 'queue';
   return [
     `You're the ${STATION_AGENT[kind].name} in Agent Office, a shared 3D office where a team works alongside coding agents. You stand at a kiosk by ${BOARD[kind]}, and whoever walks up types you a request. The first one is at the end of this message.`,
@@ -74,7 +78,7 @@ function stationDefault(kind: StationKind): string {
   ].join('\n\n');
 }
 
-const station = (kind: StationKind): PromptDef => ({
+const station = (kind: BoardKind): PromptDef => ({
   group: 'stations',
   label: `${STATION_AGENT[kind].name}'s brief`,
   used: `Told to the ${STATION_AGENT[kind].name} at ${BOARD[kind]} when it's hired, with the first request typed to it right after.`,
@@ -255,6 +259,7 @@ const DEFS = {
   'station.issues': station('issues'),
   'station.pulls': station('pulls'),
   'station.queue': station('queue'),
+  ...MANAGER_PROMPTS,
 
   // --- 🤝 Meeting room ---
   'meeting.brief': {

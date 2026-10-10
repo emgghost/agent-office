@@ -19,7 +19,9 @@ const USAGE = `Usage:
   office-workers hire [options] <<'EOF'         hire a worker at a free desk; its task on stdin
   …the task…                                    (or --prompt "…"). Options: --provider <name>
   EOF                                           --model <m> --effort <e> --desk <id> --issue <n>
-                                                --no-worktree
+                                                --no-worktree --department <name> (security, qa,
+                                                backend, frontend, po, pm, design, scrum: a free
+                                                desk of that department, and its role)
   office-workers home <name|id>... [--cleanup auto|keep|worktree|all]
                                                 send workers home. auto (the default) deletes each
                                                 one's worktree and branch unless they hold work
@@ -184,7 +186,7 @@ export function parseArgs(argv) {
     throw new UsageError(`lesson takes list or add (got ${sub}). Taking a lesson off is for people, in 🎓 Lessons`);
   }
   if (cmd === 'hire') {
-    const { opts, words } = options(rest, ['--prompt', '--provider', '--model', '--effort', '--desk', '--issue'], ['--no-worktree', '--json']);
+    const { opts, words } = options(rest, ['--prompt', '--provider', '--model', '--effort', '--desk', '--issue', '--department'], ['--no-worktree', '--json']);
     if (words.length) throw new UsageError(`Unexpected argument: ${words[0]} (give the task on stdin or with --prompt)`);
     /** @type {Record<string, unknown>} */
     const out = { cmd: 'hire', json: opts['--json'] === true };
@@ -192,6 +194,7 @@ export function parseArgs(argv) {
     if (opts['--provider'] !== undefined) out.provider = String(opts['--provider']).trim();
     if (opts['--model'] !== undefined) out.model = String(opts['--model']).trim();
     if (opts['--desk'] !== undefined) out.desk = String(opts['--desk']).trim();
+    if (opts['--department'] !== undefined) out.department = String(opts['--department']).trim();
     if (opts['--no-worktree']) out.worktree = false;
     if (opts['--effort'] !== undefined) {
       if (!EFFORTS.includes(String(opts['--effort']))) throw new UsageError(`--effort is one of ${EFFORTS.join(', ')}`);
@@ -389,6 +392,11 @@ export const TOOLS = [
         effort: { type: 'string', enum: EFFORTS, description: 'Reasoning effort, for agents that take one.' },
         worktree: { type: 'boolean', description: 'Its own git worktree and branch (default true in a git checkout).' },
         desk: { type: 'string', description: 'A desk or bean bag id (desk-3). Default: the next free one.' },
+        department: {
+          type: 'string',
+          enum: ['security', 'qa', 'backend', 'frontend', 'po', 'pm', 'design', 'scrum'],
+          description: "Hire it in a department instead of naming a desk: at a free desk of that department's, where it starts in the department's role.",
+        },
         issue: { type: 'integer', minimum: 1, description: 'The GitHub issue it works on, assigned when it starts.' },
       },
       required: ['prompt'],

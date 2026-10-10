@@ -135,8 +135,8 @@ export const BEANBAGS: DeskDef[] = (
 /** Everywhere a worker can sit: the desks, the back office's once it's built out (see deskBuilt), then the bean bags. */
 export const SEATS: DeskDef[] = [...DESKS, ...WING_DESKS, ...BEANBAGS];
 
-/** The boards with an agent standing by: the Issues board, the PR board and the task queue. */
-export type StationKind = 'issues' | 'pulls' | 'queue';
+/** The boards with an agent standing by: the Issues board, the PR board and the task queue; and the manager, who runs the office for you. */
+export type StationKind = 'issues' | 'pulls' | 'queue' | 'manager';
 
 /**
  * The board agents: a worker standing behind a little kiosk just west of each of those boards (see
@@ -150,6 +150,8 @@ export const STATIONS: DeskDef[] = [
   { id: 'station-pulls', station: 'pulls', x: 0, z: FLOOR.minZ + 1.3, rotY: Math.PI, label: 'PR board' },
   // Between the Issues board and the task queue.
   { id: 'station-queue', station: 'queue', x: -7.8, z: FLOOR.minZ + 1.3, rotY: Math.PI, label: 'Task queue' },
+  // The manager's, at the foot of the stairs up to the boss office, facing into the room.
+  { id: 'station-manager', station: 'manager', x: 5.5, z: 9, rotY: 0, label: "Manager's desk" },
 ];
 /** A board agent's kiosk: its top, and how far behind its middle (toward the wall) the agent stands. */
 export const KIOSK = { width: 0.8, depth: 0.5, height: 0.55, stand: 0.55 } as const;
@@ -158,6 +160,7 @@ export const STATION_AGENT: Record<StationKind, { name: string; color: string }>
   issues: { name: 'Issues agent', color: '#ef476f' },
   pulls: { name: 'PR agent', color: '#118ab2' },
   queue: { name: 'Queue agent', color: '#06d6a0' },
+  manager: { name: 'Manager', color: '#ffb703' },
 };
 
 /** The upstairs office: a glass-walled loft on posts in the south-east corner, looking down on the desks. */

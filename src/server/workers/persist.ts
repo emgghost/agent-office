@@ -28,6 +28,8 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     name: info.name,
     color: info.color,
     createdBy: info.createdBy,
+    // The Manager keeps hearing about the workers it hired; a herald's run in is over by now.
+    via: info.via === 'manager' ? info.via : undefined,
     createdAt: info.createdAt,
     prompt: info.prompt,
     worktree: info.worktree,
@@ -84,6 +86,7 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         status: 'offline',
         acked: true,
         createdBy: s.createdBy ?? '?',
+        ...(s.via === 'manager' ? { via: 'manager' as const } : {}),
         createdAt: s.createdAt ?? Date.now(),
         prompt: s.prompt,
         worktree: s.worktree,

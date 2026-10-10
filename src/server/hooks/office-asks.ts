@@ -1,3 +1,4 @@
+import { hiredVia } from '../manager.js';
 import type http from 'node:http';
 import { ANSWER_MAX, QUESTION_MAX, WAIT_MS, type Ask } from '../asks.js';
 import { findWorker } from '../office-workers.js';
@@ -57,7 +58,7 @@ export async function officeAsks(ctx: Ctx, req: http.IncomingMessage, res: http.
     asked = there
       ? floor.asks.ask(me, there, question)
       : floor.asks.askHiring(me, question, (prompt) => {
-          const hired = floor.workers.spawn(desk!, me.name, prompt, false, 'agent', undefined, undefined, undefined, undefined, floor.workers.ownerOf(me.id));
+          const hired = floor.workers.spawn(desk!, me.name, prompt, false, 'agent', undefined, undefined, undefined, undefined, floor.workers.ownerOf(me.id), [], hiredVia(me));
           if (typeof hired !== 'string') ctx.toastFloor(floor, `${dept.emoji} ${me.name} hired ${hired.name} in ${dept.name} to answer a question`);
           return hired;
         });
