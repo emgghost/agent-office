@@ -1,0 +1,19 @@
+/* 🎓 Lessons */
+.lessons header .lesson-count { margin-left: auto; margin-right: 8px; font-weight: 800; color: var(--muted); }
+.lessons .body > .note { margin: 0 0 12px; }
+.lesson-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: min(52vh, 460px); overflow-y: auto; }
+.lesson { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; }
+.lesson.editing { background: var(--paper-2); }
+.lesson-n { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--warn); border: 2px solid var(--ink); font-weight: 900; font-size: 13px; }
+.lesson-main { flex: 1; min-width: 0; }
+.lesson-text { font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+.lesson-meta { margin-top: 3px; font-size: 12px; color: var(--muted); }
+.lesson-acts { flex: none; display: flex; gap: 6px; }
+.lesson-acts .btn { padding: 5px 9px; }
+.lesson-empty { text-align: center; padding: 18px 8px; border: 3px dashed var(--muted); border-radius: 14px; }
+.lesson-empty p { margin: 0; font-weight: 800; }
+.lesson-empty p.note { margin-top: 6px; font-weight: 600; }
+.lesson-new { display: flex; gap: 8px; align-items: stretch; }
+.lesson-input { flex: 1; width: 100%; min-width: 0; resize: vertical; font: 600 14px/1.35 var(--font); padding: 8px 10px; border: 3px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); unicode-bidi: plaintext; }
+.lesson-input:disabled { opacity: .6; }
+.lesson-error { margin: 8px 0 0; color: var(--bad); font-weight: 800; }

@@ -16,6 +16,7 @@ import { openCharacter } from '../../ui/character';
 import { $ } from '../../ui/dom';
 import { toggleFloorMenu } from '../../ui/floormenu';
 import { openHelp } from '../../ui/hud';
+import { openLessons } from '../../ui/lessons';
 import { mountHud } from '../../ui/menu';
 import { openServices } from '../../ui/services';
 import { openSettings, type SettingsPane } from '../../ui/settings';
@@ -54,6 +55,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       { id: 'queue', icon: '📋', label: 'Task queue', section: 'Open', count: () => store.queue.tasks.filter((t) => t.status !== 'done').length, title: () => 'Issues and tasks waiting for a worker', run: waiting.showQueue },
       { id: 'services', icon: '🌐', label: 'Services', section: 'Open', count: () => store.services.items.length, title: () => 'Web servers the workers are running', run: () => openServices() },
       { id: 'whiteboard', icon: '📝', label: 'Whiteboard', section: 'Open', title: () => 'Draw together, live', run: () => openWhiteboard(net) },
+      { id: 'lessons', icon: '🎓', label: 'Lessons', section: 'Open', shown: () => !!store.floor, count: () => store.lessons.items.length, title: () => 'What this project’s workers have learned: every new one starts with it', run: () => openLessons(net) },
       // Up on the top bar while a meeting is on: what's being worked through in the meeting room.
       {
         id: 'meeting',
