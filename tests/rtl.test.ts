@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rtlRuns } from '../src/client/ui/rtl.js';
+import { rtlCells, rtlRuns } from '../src/client/ui/rtl.js';
 
 const runs = (text: string) => rtlRuns(text).map(([a, b]) => text.slice(a, b));
 
@@ -32,3 +32,13 @@ test('a line with no right-to-left text, or one lone letter, joins nothing', () 
   assert.deepEqual(rtlRuns(''), []);
   assert.deepEqual(rtlRuns('a ب c'), []);
 });
+
+test('a run takes a cell a letter, space and punctuation, and none for its marks and joiners', () => {
+  // What a fitted piece is sized to: the cells xterm gave it, or the rest of the row would move.
+  assert.equal(rtlCells('سلام دنیا'), 9);
+  assert.equal(rtlCells('تست‌ها'), 5, 'the zero-width non-joiner shares the cell before it');
+  assert.equal(rtlCells('مُحَمَّد'), 4, 'vowel marks sit on their letters');
+  assert.equal(rtlCells('خطا: فایل (۳ بار)'), 17);
+  assert.equal(rtlCells('שָׁלוֹם'), 4);
+});
+
