@@ -16,6 +16,8 @@ import { openCharacter } from '../../ui/character';
 import { $ } from '../../ui/dom';
 import { toggleFloorMenu } from '../../ui/floormenu';
 import { openHelp } from '../../ui/hud';
+import { currentGpu } from '../../gpu';
+import { gpuHolding, openGpu } from '../../ui/gpu';
 import { openLessons } from '../../ui/lessons';
 import { mountHud } from '../../ui/menu';
 import { openServices } from '../../ui/services';
@@ -95,6 +97,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       { id: 'signins', icon: '🔐', label: 'Your sign-ins', section: 'Together', shown: () => !!store.me.account, tone: () => (needsSigningIn() ? 'danger' : undefined), status: needsSigningIn, chip: () => 'Sign in to Claude', title: () => 'The Claude plan and GitHub account your workers run on: your own', run: () => openSignIns(net) },
       { id: 'settings', icon: '⚙️', label: 'Settings', section: 'Office', run: showSettings },
       { id: 'help', icon: '❓', label: 'Controls', section: 'Office', key: 'H', run: openHelp },
+      { id: 'gpu', icon: '🖥️', label: 'Graphics', section: 'Office', tone: () => (gpuHolding() ? 'danger' : undefined), title: () => `Drawn on ${currentGpu()?.name ?? 'unknown graphics'}: how to use the graphics card`, run: openGpu },
       { id: 'lite', icon: '📱', label: '2D view', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => location.assign('/lite') },
       {
         id: 'upgrade',
