@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Ctx } from '../office/context.js';
 import { readBody, send } from '../http/util.js';
+import { officeAsks } from './office-asks.js';
 import { officeLessons } from './office-lessons.js';
 import { officeQueue } from './office-queue.js';
 import { officeWorkers } from './office-workers.js';
@@ -21,6 +22,7 @@ export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Serv
       return send(res, 400, {});
     }
     if (url.pathname === '/office/queue') return officeQueue(ctx, req, res, url);
+    if (url.pathname === '/office/workers/ask' || url.pathname.startsWith('/office/workers/ask/')) return officeAsks(ctx, req, res, url);
     if (url.pathname === '/office/lessons') return officeLessons(ctx, req, res, url);
     if (url.pathname === '/office/workers' || url.pathname.startsWith('/office/workers/')) return officeWorkers(ctx, req, res, url);
     // Each provider with hooks has its route, /hooks/<provider> (see providers/).

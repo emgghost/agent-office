@@ -6,7 +6,7 @@
 
 import { STATION_AGENT, type StationKind } from './layout.js';
 
-export type PromptGroup = 'issues' | 'pulls' | 'queue' | 'repos' | 'lessons' | 'stations' | 'meetings' | 'office';
+export type PromptGroup = 'issues' | 'pulls' | 'queue' | 'repos' | 'lessons' | 'asks' | 'stations' | 'meetings' | 'office';
 
 /** The editor's sections, in order. */
 export const PROMPT_GROUPS: Record<PromptGroup, string> = {
@@ -15,6 +15,7 @@ export const PROMPT_GROUPS: Record<PromptGroup, string> = {
   queue: '📋 Task queue',
   repos: '🗂️ Across repositories',
   lessons: '🎓 Lessons',
+  asks: '💬 Questions between workers',
   stations: '🧑‍💼 Board agents',
   meetings: '🤝 Meeting room',
   office: '🏷️ Worker signs',
@@ -197,6 +198,30 @@ const DEFS = {
       '',
       'Your task:',
     ].join('\n'),
+  },
+
+  // --- 💬 Questions between workers ---
+  'worker.question': {
+    group: 'asks',
+    label: '💬 A question for a worker',
+    used: 'Typed to a worker when another worker asks it something (ask_worker, office-workers ask), once it is free to take it.',
+    vars: { from: 'The worker asking', id: "The question's id, to answer it by", question: 'What it asked' },
+    needs: ['id', 'question'],
+    text: [
+      '💬 {{from}}, another worker in this office, has a question for you (question {{id}}). Answer it from what you know or can find out here, keep it short and concrete, then carry on with what you were doing:',
+      '',
+      '{{question}}',
+      '',
+      "Answer with the answer_question tool (id {{id}}), or from a shell: office-workers answer {{id}} <<'EOF' … your answer … EOF. If you can't answer it, say so in the answer and say who might.",
+    ].join('\n'),
+  },
+  'worker.answer': {
+    group: 'asks',
+    label: '💬 The answer, when it comes late',
+    used: "Typed to the worker that asked, when the answer comes after it stopped waiting for it (ask_worker waits up to 45 seconds).",
+    vars: { from: 'The worker that answered', id: "The question's id", question: 'What was asked', answer: 'Its answer' },
+    needs: ['answer'],
+    text: '💬 {{from}} answered your question {{id}} ("{{question}}"):\n\n{{answer}}',
   },
 
   // --- 🗂️ Across repositories ---

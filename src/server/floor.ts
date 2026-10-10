@@ -13,6 +13,7 @@ import type { GhAs } from './signins.js';
 import { TaskQueue } from './queue.js';
 import { Changes } from './changes.js';
 import { Decor } from './decor.js';
+import { Asks } from './asks.js';
 import { Lessons } from './lessons.js';
 import { FloorPlanStore } from './floorplan.js';
 import { Docs } from './docs.js';
@@ -118,6 +119,8 @@ export class Floor {
   readonly queue: TaskQueue;
   readonly changes: Changes;
   readonly decor: Decor;
+  /** Questions its workers ask one another, on their way between terminals. */
+  readonly asks: Asks;
   /** What its workers have learned, which every new one starts with. */
   readonly lessons: Lessons;
   /** The signs over its desks, and how far its back office is built out. */
@@ -183,6 +186,7 @@ export class Floor {
           this.queue?.onWorker(worker);
           this.meetings?.onWorker(worker);
           this.dog.onWorker(worker);
+          this.asks?.onWorker(worker);
           ctx.workerChanged(this, worker);
           // Its turn ended, or whoever had its terminal open closed it: it may be free to go now.
           this.sendLandedHome();
@@ -197,6 +201,7 @@ export class Floor {
           this.queue?.onWorkerGone(workerId);
           this.meetings?.onWorkerGone(workerId);
           this.dog.onWorkerGone(workerId);
+          this.asks?.onWorkerGone(workerId);
           ctx.workerChanged(this, workerId);
         },
         data: (workerId, data, viewers) => ctx.termData(workerId, data, viewers),
@@ -210,6 +215,7 @@ export class Floor {
       ctx.dshProfile,
     );
     this.workers.wing = () => this.plan.wing;
+    this.asks = new Asks(this.workers, ctx.prompts, (text) => ctx.toast(this, text));
     this.workers.brief = (prompt) => this.lessons.brief(prompt, ctx.prompts);
 
     this.github = new GitHub(
