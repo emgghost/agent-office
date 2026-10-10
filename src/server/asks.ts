@@ -78,6 +78,24 @@ export class Asks {
     return { ...a };
   }
 
+  /**
+   * `from` asks someone `hire` is about to hire for it, there being nobody to ask yet (a department
+   * with nobody in it): the question is the new worker's first task, so it's asked as it starts.
+   * Returns the question, or why it can't be asked (`hire`'s own reason, when it can't hire).
+   */
+  askHiring(from: WorkerInfo, raw: string, hire: (prompt: string) => WorkerInfo | string): Ask | string {
+    const question = raw.replace(/\r\n?/g, '\n').trim().slice(0, QUESTION_MAX);
+    if (!question) return 'Say what you want to know: question';
+    const id = `q${randomBytes(3).toString('hex')}`;
+    const hired = hire(officePrompt(this.prompts, 'worker.question', { from: from.name, id, question }));
+    if (typeof hired === 'string') return hired;
+    const a: Ask = { id, from: from.id, fromName: from.name, to: hired.id, toName: hired.name, question, status: 'asked', at: Date.now() };
+    this.asks.set(a.id, a);
+    while (this.asks.size > KEEP) this.asks.delete(this.asks.keys().next().value!);
+    this.toast(`💬 ${from.name} asked ${hired.name}: “${gist(question)}”`);
+    return { ...a };
+  }
+
   /** `by` answers question `id`: only the worker it was asked of can. Returns the question, or why not. */
   answer(id: string, by: WorkerInfo, raw: string): Ask | string {
     const a = this.asks.get(id.trim());

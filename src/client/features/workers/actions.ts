@@ -4,6 +4,7 @@
  * at a desk; and what the hint bar says at a desk or a board agent's kiosk. Also what the boards'
  * buttons do with a worker.
  */
+import { departmentOf } from '../../../shared/departments';
 import { STATION_AGENT, deskSeat, type DeskDef } from '../../../shared/layout';
 import { canLabel } from '../../../shared/floorplan';
 import { officeFull, pressureNote } from '../../../shared/machine';
@@ -129,10 +130,11 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
   /** Direct hire from an empty desk, with an optional first prompt and provider choice. */
   function hireAtDesk(deskId: string) {
     const desk = plan().byId.get(deskId)!;
+    const dept = departmentOf(deskId);
     if (officeIsFull()) return;
     openPrompt({
-      title: `✨ Hire a worker at ${desk.label}`,
-      subtitle: 'You can start with an empty prompt and send work later.',
+      title: dept ? `${dept.emoji} Hire for ${dept.name} at ${desk.label}` : `✨ Hire a worker at ${desk.label}`,
+      subtitle: dept ? `${dept.does}. It starts in that role, with or without a first task.` : 'You can start with an empty prompt and send work later.',
       warning: pressureNote(store.machine),
       placeholder: 'Optional first task…',
       submitLabel: 'Hire & start',

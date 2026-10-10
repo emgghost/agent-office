@@ -4,6 +4,7 @@ import type { AgentChoice, AgentEffort, AgentProvider, TerminalHit, WorkerInfo, 
 import { AGENT_PROVIDERS, takesEffort, takesModel } from '../../shared/providers.js';
 import { Worktrees, workspaceOf, type WorktreeCleanup, type WorktreeState } from '../worktrees.js';
 import { DESK_BY_ID, STATION_AGENT, deskBuilt } from '../../shared/layout.js';
+import { departmentOf } from '../../shared/departments.js';
 import { stationBrief } from '../stations.js';
 import type { PromptSource } from '../prompts.js';
 import type { GhAs } from '../signins.js';
@@ -71,8 +72,8 @@ export class WorkerManager {
   private saveTimer: NodeJS.Timeout;
   /** How many rows the floor's back office is built out: its desks past that aren't there to hire at (see WING). */
   wing: () => number = () => 0;
-  /** A new agent's first prompt as it's sent: with its floor's lessons ahead of it (see lessons.ts). */
-  brief: (prompt: string) => string = (prompt) => prompt;
+  /** A new agent's first prompt as it's sent: with its department's role and its floor's lessons ahead of it (see floor.ts). */
+  brief: (prompt: string | undefined, info: WorkerInfo) => string | undefined = (prompt) => prompt;
 
   constructor(
     private dir: string,
@@ -101,11 +102,7 @@ export class WorkerManager {
     this.agentPath = resolveCommand(agentCmd);
     const self = this;
     this.ctx = {
-      dir,
-      trees: this.trees,
-      workers: this.workers,
-      events,
-      prompts,
+      dir, trees: this.trees, workers: this.workers, events, prompts,
       get closing() {
         return self.closing;
       },
@@ -276,7 +273,7 @@ export class WorkerManager {
       effort: takesEffort(selectedProvider) ? effort : undefined,
       deskId,
       name: kind === 'shell' ? `${name} 🐚` : name,
-      color: kind === 'shell' ? '#8d99ae' : agent ? agent.color : COLORS[Math.floor(Math.random() * COLORS.length)],
+      color: kind === 'shell' ? '#8d99ae' : agent ? agent.color : (departmentOf(deskId)?.color ?? COLORS[Math.floor(Math.random() * COLORS.length)]),
       status: 'starting',
       acked: true,
       createdBy: by,
@@ -299,7 +296,7 @@ export class WorkerManager {
     // A board agent is told what it's there for ahead of its first request (which is what shows), and
     // every agent but a meeting's what its floor has learned ahead of that.
     const first = seat.station && info.prompt ? `${stationBrief(seat.station, this.prompts)}\n\n${info.prompt}` : info.prompt;
-    this.launch(w, first && !meeting ? this.brief(first) : first, undefined);
+    this.launch(w, meeting ? first : this.brief(first, info), undefined);
     this.persist();
     return info;
   }

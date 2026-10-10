@@ -8,7 +8,7 @@ import { ease, popIn } from './curves';
 import { undress } from './props';
 import { ACT_MIN, DESPAIR_MIN, TWIRL_TIME, WAIT_CYCLE, WAIT_HOPS, blendStance, type Act, type Stance } from './worker-stance';
 import { STATUS_BULB, bubbleFor } from './worker-badges';
-import { globe, papers } from './worker-props';
+import { globe, headset, papers } from './worker-props';
 import { DANCE, groove, type Dancing, type Stage } from './worker-dance';
 import { DEAD, STARVED, bones, crossedEyes, slump } from './worker-jail';
 import { packUp, waddle, type Leaving } from './worker-leave';
@@ -120,16 +120,8 @@ export class Worker {
       this.eyes.push(eye, pupil);
       this.pupils.push(pupil);
     }
-    // Headset: band + mic
-    const band = mesh(new THREE.TorusGeometry(0.29, 0.025, 6, 20, Math.PI), toon('#2b2d42'), 0, 0.72, 0, false);
-    band.rotation.y = Math.PI / 2;
-    this.body.add(band);
-    this.headset.push(band);
-    for (const sx of [-1, 1]) {
-      const cup = mesh(new THREE.SphereGeometry(0.07, 10, 8), toon('#2b2d42'), sx * 0.29, 0.72, 0, false);
-      this.body.add(cup);
-      this.headset.push(cup);
-    }
+    this.headset = headset();
+    this.body.add(...this.headset);
     // Antenna with status bulb
     this.body.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), toon('#2b2d42'), 0, 1.07, 0, false));
     this.bulb = toonUnique(STATUS_BULB.starting);
@@ -179,6 +171,12 @@ export class Worker {
   celebrate() {
     this.twirlT = 0;
     this.cheer(1.2);
+  }
+
+  /** Puts on what its department wears (see features/departments/gear.ts), in place of what it wore before; null takes it off. */
+  wearGear(gear: THREE.Object3D | null) {
+    this.body.remove(...this.body.children.filter((c) => c.name === 'gear'));
+    if (gear) this.body.add(Object.assign(gear, { name: 'gear' }));
   }
 
   /** Dresses it up for a holiday (a zombie for Halloween, an elf for Christmas), or back in its own skin (null). */

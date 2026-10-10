@@ -214,7 +214,7 @@ test("a worker's row says where its pull request stands, and whether it would go
   const view = { pulls: [pull(7, 'MERGED', 'office/bolt', head), pull(8, 'OPEN', 'office/zed')], tasks: [] };
   const bolt = workerRow(worker('bolt', { task: { name: 'Login fix', summary: 'Fixed the redirect' } }), view, 'mochi');
   assert.deepEqual(bolt, {
-    id: 'bolt', name: 'Bolt', kind: 'agent', desk: 'Desk 1', status: 'done', task: 'Login fix: Fixed the redirect', hiredBy: 'Ada', hiredAt: '1970-01-01T00:00:00.000Z',
+    id: 'bolt', name: 'Bolt', kind: 'agent', desk: 'Desk 1', status: 'done', department: 'Security', task: 'Login fix: Fixed the redirect', hiredBy: 'Ada', hiredAt: '1970-01-01T00:00:00.000Z',
     worktree: { path: '.agent-office/worktrees/bolt', branch: 'office/bolt' },
     pr: { number: 7, state: 'merged', title: 'PR 7', url: 'https://github.com/acme/app/pull/7' },
     merged: true,

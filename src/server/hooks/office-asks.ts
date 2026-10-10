@@ -1,6 +1,8 @@
 import type http from 'node:http';
 import { ANSWER_MAX, QUESTION_MAX, WAIT_MS, type Ask } from '../asks.js';
 import { findWorker } from '../office-workers.js';
+import { departmentWorker, freeDepartmentDesk } from '../departments.js';
+import { DEPARTMENT_IDS, findDepartment } from '../../shared/departments.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
@@ -17,8 +19,8 @@ const view = (a: Ask) => ({
 
 /**
  * Questions between a floor's workers (see asks.ts, and `office-workers ask` / `answer`): POST
- * /office/workers/ask {worker, question, wait?} asks one and waits up to `wait` seconds (45 at most)
- * for the answer, POST /office/workers/ask/answer {id, answer} answers one asked of you, and GET
+ * /office/workers/ask {worker or department, question, wait?} asks one (in a department: whoever there
+ * can take it, or someone hired there for it) and waits up to `wait` seconds (45 at most) for the answer, POST /office/workers/ask/answer {id, answer} answers one asked of you, and GET
  * lists the ones asked of you and by you. The worker's own hook token says who's asking.
  */
 export async function officeAsks(ctx: Ctx, req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
@@ -43,9 +45,27 @@ export async function officeAsks(ctx: Ctx, req: http.IncomingMessage, res: http.
     const a = floor.asks.answer(str(body?.id, 32), me, str(body?.answer, ANSWER_MAX * 2));
     return typeof a === 'string' ? send(res, 400, { error: a }) : send(res, 200, { ok: true, question: view(a) });
   }
-  const to = findWorker(floor.workers.list(), str(body?.worker, 64));
-  if (typeof to === 'string') return send(res, 404, { error: to });
-  const asked = floor.asks.ask(me, to, str(body?.question, QUESTION_MAX * 2));
+  const question = str(body?.question, QUESTION_MAX * 2);
+  let asked: Ask | string;
+  if (body?.department !== undefined && !body?.worker) {
+    // A department: whoever there is readiest to take it, or someone hired at a free desk of its for it.
+    const dept = findDepartment(str(body.department, 40));
+    if (!dept) return send(res, 404, { error: `No department called ${str(body.department, 40)} (there's ${DEPARTMENT_IDS.join(', ')})` });
+    const there = departmentWorker(floor.workers.list(), dept, me.id);
+    const desk = there ? undefined : freeDepartmentDesk(dept, (id) => floor.workers.deskOccupied(id));
+    if (!there && !desk) return send(res, 409, { error: `Nobody else in ${dept.emoji} ${dept.name} can take a question, and both its desks are taken` });
+    asked = there
+      ? floor.asks.ask(me, there, question)
+      : floor.asks.askHiring(me, question, (prompt) => {
+          const hired = floor.workers.spawn(desk!, me.name, prompt, false, 'agent', undefined, undefined, undefined, undefined, floor.workers.ownerOf(me.id));
+          if (typeof hired !== 'string') ctx.toastFloor(floor, `${dept.emoji} ${me.name} hired ${hired.name} in ${dept.name} to answer a question`);
+          return hired;
+        });
+  } else {
+    const to = findWorker(floor.workers.list(), str(body?.worker, 64));
+    if (typeof to === 'string') return send(res, 404, { error: to });
+    asked = floor.asks.ask(me, to, question);
+  }
   if (typeof asked === 'string') return send(res, 400, { error: asked });
   const seconds = typeof body?.wait === 'number' && Number.isFinite(body.wait) ? Math.max(0, Math.min(body.wait, WAIT_MS / 1000)) : WAIT_MS / 1000;
   // The call can go before the answer comes (an agent's tool timeout): the answer is typed into the asker's terminal then.

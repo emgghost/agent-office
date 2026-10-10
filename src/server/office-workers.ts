@@ -2,6 +2,7 @@
 // server (bin/office-workers.js) get from the /office/workers endpoint on the loopback hook port, and
 // how their requests are read. The endpoint itself is in server.ts, next to the board agents' queue.
 
+import { departmentOf } from '../shared/departments.js';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { AgentEffort, AgentProvider, GhPull, QueueTask, WorkerInfo, WorkerStatus, WorktreeCleanup } from '../shared/protocol.js';
@@ -21,6 +22,8 @@ export interface WorkerRow {
   status: WorkerStatus;
   /** The board it stands by, for a board agent ("PR agent"). */
   board?: string;
+  /** The department its desk belongs to (shared/departments.ts). */
+  department?: string;
   /** At the meeting room's table, called to a meeting. */
   meeting?: true;
   /** The worker asking. */
@@ -78,6 +81,7 @@ export function workerRow(w: WorkerInfo, view: PullsView, me?: string): WorkerRo
     desk: seat?.label ?? w.deskId,
     status: w.status,
     ...(seat?.station ? { board: STATION_AGENT[seat.station].name } : {}),
+    ...(departmentOf(w.deskId) ? { department: departmentOf(w.deskId)!.name } : {}),
     ...(w.meeting ? { meeting: true as const } : {}),
     ...(w.id === me ? { you: true as const } : {}),
     ...(task ? { task } : {}),
