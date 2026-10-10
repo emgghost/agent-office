@@ -13,6 +13,7 @@ import type { GhAs } from './signins.js';
 import { TaskQueue } from './queue.js';
 import { Changes } from './changes.js';
 import { Decor } from './decor.js';
+import { Lessons } from './lessons.js';
 import { FloorPlanStore } from './floorplan.js';
 import { Docs } from './docs.js';
 import { Dog } from './dog.js';
@@ -117,6 +118,8 @@ export class Floor {
   readonly queue: TaskQueue;
   readonly changes: Changes;
   readonly decor: Decor;
+  /** What its workers have learned, which every new one starts with. */
+  readonly lessons: Lessons;
   /** The signs over its desks, and how far its back office is built out. */
   readonly plan: FloorPlanStore;
   readonly jukebox: Jukebox;
@@ -157,6 +160,7 @@ export class Floor {
     // Before the workers and the dog: the back office's desks are only there once it's built.
     this.plan = new FloorPlanStore(dataDir);
     this.jail = new Jail(dataDir);
+    this.lessons = new Lessons(dataDir, (state) => ctx.emit(this, { t: 'lessons', state }));
 
     // Before the workers, so it hears about the ones who wake up needing input.
     this.dog = new Dog(def.id, dataDir, {
@@ -206,6 +210,7 @@ export class Floor {
       ctx.dshProfile,
     );
     this.workers.wing = () => this.plan.wing;
+    this.workers.brief = (prompt) => this.lessons.brief(prompt, ctx.prompts);
 
     this.github = new GitHub(
       def.dir,

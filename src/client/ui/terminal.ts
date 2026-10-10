@@ -15,6 +15,7 @@ import { engineLabel, providerUsageNote, providerUsageState, providerWaitingLabe
 import { naturalKey } from './termkeys';
 import { termTabs } from './termtabs';
 import { dictateField, dictation } from './dictate';
+import { joinRtl } from './rtl';
 
 /** A line to scroll to once the terminal has loaded: a search hit (see search.ts). */
 export interface TerminalFind {
@@ -367,6 +368,7 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
   });
 
   term.open(host);
+  joinRtl(term);
   const sendEsc = () => {
     sendSize(true);
     sayTyping();
