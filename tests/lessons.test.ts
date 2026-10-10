@@ -115,7 +115,8 @@ test('the worker manager sends a hired agent its brief with its first task, and 
     stop() {},
     detach() {},
   } as any;
-  workers.brief = (prompt) => `LESSONS\n\n${prompt}`;
+  const briefed: (string | undefined)[] = [];
+  workers.brief = (prompt) => (briefed.push(prompt), prompt && `LESSONS\n\n${prompt}`);
 
   const hired = workers.spawn('desk-1', 'Ada', 'Fix login', false, 'agent', 'pi');
   assert.ok(typeof hired === 'object');
@@ -125,6 +126,8 @@ test('the worker manager sends a hired agent its brief with its first task, and 
 
   const idle = workers.spawn('desk-2', 'Ada', undefined, false, 'agent', 'pi');
   assert.ok(typeof idle === 'object');
+  // Hired without a task, the floor still gets a say (a department's worker starts in its role), here none.
+  assert.deepEqual(briefed, ['Fix login', undefined]);
   assert.ok(!launches[1].args.some((a) => a.includes('LESSONS')), 'hired without a task: nothing to put it ahead of');
 });
 

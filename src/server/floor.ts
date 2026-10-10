@@ -15,6 +15,7 @@ import { Changes } from './changes.js';
 import { Decor } from './decor.js';
 import { Asks } from './asks.js';
 import { Lessons } from './lessons.js';
+import { firstPrompt } from './departments.js';
 import { FloorPlanStore } from './floorplan.js';
 import { Docs } from './docs.js';
 import { Dog } from './dog.js';
@@ -216,7 +217,8 @@ export class Floor {
     );
     this.workers.wing = () => this.plan.wing;
     this.asks = new Asks(this.workers, ctx.prompts, (text) => ctx.toast(this, text));
-    this.workers.brief = (prompt) => this.lessons.brief(prompt, ctx.prompts);
+    // Its department's role first, then what the floor has learned, then the task.
+    this.workers.brief = firstPrompt(this.lessons, ctx.prompts);
 
     this.github = new GitHub(
       def.dir,

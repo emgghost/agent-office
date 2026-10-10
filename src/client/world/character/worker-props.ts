@@ -58,3 +58,11 @@ export function globe(): { group: THREE.Group; ball: THREE.Group; ring: THREE.Me
   group.add(ring);
   return { group, ball, ring };
 }
+
+/** Its headset: a band over the top of its head, and a cup on either side. */
+export function headset(): THREE.Mesh[] {
+  const ink = toon('#2b2d42');
+  const band = mesh(new THREE.TorusGeometry(0.29, 0.025, 6, 20, Math.PI), ink, 0, 0.72, 0, false);
+  band.rotation.y = Math.PI / 2;
+  return [band, ...[-1, 1].map((sx) => mesh(new THREE.SphereGeometry(0.07, 10, 8), ink, sx * 0.29, 0.72, 0, false))];
+}

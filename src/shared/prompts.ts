@@ -4,9 +4,10 @@
 // server/prompts.ts, for the whole building); these are the defaults, which "Default" goes back to.
 // A {{name}} in one is filled in by the office when it's sent.
 
+import { DEPARTMENT_PROMPTS } from './department-prompts.js';
 import { STATION_AGENT, type StationKind } from './layout.js';
 
-export type PromptGroup = 'issues' | 'pulls' | 'queue' | 'repos' | 'lessons' | 'asks' | 'stations' | 'meetings' | 'office';
+export type PromptGroup = 'issues' | 'pulls' | 'queue' | 'repos' | 'lessons' | 'asks' | 'departments' | 'stations' | 'meetings' | 'office';
 
 /** The editor's sections, in order. */
 export const PROMPT_GROUPS: Record<PromptGroup, string> = {
@@ -16,6 +17,7 @@ export const PROMPT_GROUPS: Record<PromptGroup, string> = {
   repos: '🗂️ Across repositories',
   lessons: '🎓 Lessons',
   asks: '💬 Questions between workers',
+  departments: '🏢 Departments',
   stations: '🧑‍💼 Board agents',
   meetings: '🤝 Meeting room',
   office: '🏷️ Worker signs',
@@ -91,6 +93,8 @@ const FILE_NOTE = 'The note this part is written to, which the meeting waits for
 const OUTPUT_NOTE = "The meeting's output file, which ends it";
 
 const DEFS = {
+  ...DEPARTMENT_PROMPTS,
+
   // --- 📌 Issues board ---
   'issue.work': {
     group: 'issues',

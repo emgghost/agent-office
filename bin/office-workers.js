@@ -41,6 +41,9 @@ const USAGE = `Usage:
   …the question…                                ask another worker something you can't find out
   EOF                                           yourself (or --question "…"); waits up to 45s
                                                 for the answer, else it's typed into your terminal
+  office-workers ask --department <name> …      ask a department instead (security, qa, backend,
+                                                frontend, po, pm, design, scrum): whoever is there,
+                                                or someone hired there for it
   office-workers answer <id> <<'EOF'            answer a question asked of you (or --answer "…")
   …the answer…
   EOF
@@ -144,9 +147,10 @@ export function parseArgs(argv) {
     return { cmd: 'pr', ...(none ? { unlink: true } : { pr: words[0] }), ...(opts['--worker'] !== undefined ? { worker: String(opts['--worker']).trim() } : {}), json: opts['--json'] === true };
   }
   if (cmd === 'ask') {
-    const { opts, words } = options(rest, ['--question', '--wait'], ['--json']);
-    if (words.length !== 1) throw new UsageError('ask takes one worker, its name or id, with the question on stdin or --question "…"');
-    const out = { cmd: 'ask', worker: words[0], json: opts['--json'] === true };
+    const { opts, words } = options(rest, ['--question', '--wait', '--department'], ['--json']);
+    const department = opts['--department'] !== undefined ? String(opts['--department']).trim() : undefined;
+    if (department ? words.length : words.length !== 1) throw new UsageError('ask takes one worker, its name or id, or --department <name>, with the question on stdin or --question "…"');
+    const out = { cmd: 'ask', ...(department ? { department } : { worker: words[0] }), json: opts['--json'] === true };
     if (opts['--question'] !== undefined) out.question = opts['--question'];
     if (opts['--wait'] !== undefined) {
       const wait = Number(opts['--wait']);
@@ -281,7 +285,7 @@ export async function call(what, body, io) {
 
 /** One worker, in a line. */
 export function formatWorker(w) {
-  const tags = [w.you ? 'you' : '', w.board ?? '', w.meeting ? 'meeting' : '', w.kind === 'shell' ? 'shell' : w.provider ?? ''].filter(Boolean);
+  const tags = [w.you ? 'you' : '', w.board ?? '', w.department ?? '', w.meeting ? 'meeting' : '', w.kind === 'shell' ? 'shell' : w.provider ?? ''].filter(Boolean);
   const parts = [`${w.name}${tags.length ? ` (${tags.join(', ')})` : ''}`, w.status, w.desk];
   if (w.worktree) parts.push(`branch ${w.worktree.branch}${w.worktree.deleted ? ', worktree deleted: rebuild it at its desk' : ''}`);
   if (w.repos?.length) parts.push(`also in ${w.repos.map((r) => r.name).join(', ')}`);
@@ -478,17 +482,22 @@ export const TOOLS = [
     name: 'ask_worker',
     title: 'Ask a worker',
     description:
-      "Asks another worker in this office a question, when you need to know something you can't find out yourself: what another worker changed or decided, " +
+      "Asks another worker in this office a question, or a department (security, qa, backend, frontend, po, pm, design, scrum), when you need to know something you can't find out yourself: what another worker changed or decided, " +
       "how something in its part works, information only it has access to. The office types the question into that worker's terminal once it's free (it carries on with its own task after answering). " +
       "Waits up to 45 seconds for the answer; when it comes later, it's typed into your terminal as your next message, so carry on with what doesn't need it. " +
       WORKER_NOTE,
     inputSchema: {
       type: 'object',
       properties: {
-        worker: { type: 'string', description: 'Who to ask, by name or id.' },
+        worker: { type: 'string', description: 'Who to ask, by name or id. Leave it out to ask a department.' },
+        department: {
+          type: 'string',
+          enum: ['security', 'qa', 'backend', 'frontend', 'po', 'pm', 'design', 'scrum'],
+          description: "A department to ask instead of a worker: whoever is in it answers, and when nobody is, the office hires someone there for the question (list_workers shows each worker's department).",
+        },
         question: { type: 'string', description: 'The question, complete on its own: the other worker knows nothing of your task.' },
       },
-      required: ['worker', 'question'],
+      required: ['question'],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -550,7 +559,7 @@ async function runTool(name, args, io) {
   if (name === 'link_pr') return { text: formatLinked(await call('pr', a, io)) };
   if (name === 'list_lessons') return { text: formatLessons(await call('lessons', undefined, io)) };
   if (name === 'record_lesson') return { text: formatLearned(await call('learn', { text: a.text }, io)) };
-  if (name === 'ask_worker') return { text: formatAsked(await call('ask', { worker: a.worker, question: a.question }, io)) };
+  if (name === 'ask_worker') return { text: formatAsked(await call('ask', { ...(a.worker ? { worker: a.worker } : { department: a.department }), question: a.question }, io)) };
   if (name === 'answer_question') {
     const answer = await call('answer', { id: a.id, answer: a.answer }, io);
     return { text: `Answered ${answer.question?.from ?? ''} (question ${answer.question?.id ?? a.id}).` };
@@ -695,8 +704,9 @@ export async function main(argv, io = {}) {
     }
     if (cmd.cmd === 'ask') {
       const question = (cmd.question !== undefined ? String(cmd.question) : stdin.isTTY ? '' : await readStdin(stdin)).trim();
-      if (!question) throw new UsageError(`Give the question on stdin (office-workers ask ${cmd.worker} <<'EOF' … EOF) or with --question "…"`);
-      const answer = await call('ask', { worker: cmd.worker, question, ...(cmd.wait !== undefined ? { wait: cmd.wait } : {}) }, ctx);
+      if (!question) throw new UsageError(`Give the question on stdin (office-workers ask ${cmd.worker ?? `--department ${cmd.department}`} <<'EOF' … EOF) or with --question "…"`);
+      const who = cmd.department ? { department: cmd.department } : { worker: cmd.worker };
+      const answer = await call('ask', { ...who, question, ...(cmd.wait !== undefined ? { wait: cmd.wait } : {}) }, ctx);
       out(cmd.json ? JSON.stringify(answer.question, null, 2) : formatAsked(answer));
       return 0;
     }
