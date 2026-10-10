@@ -1,3 +1,6 @@
+import { hiredVia } from '../manager.js';
+import { DEPARTMENTS } from '../../shared/departments.js';
+import { freeDepartmentDesk } from '../departments.js';
 import type http from 'node:http';
 import { notLeaving } from '../leave-on-merge.js';
 import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow, type PullsView } from '../office-workers.js';
@@ -144,8 +147,10 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
 
   const ask = readHireRequest(body, floor.project.agentProviders);
   if (typeof ask === 'string') return send(res, 400, { error: ask });
-  const desk = ask.desk ?? nextFreeSeat((id) => floor.workers.deskOccupied(id), floor.plan.wing)?.id;
-  if (!desk) return send(res, 409, { error: 'Every desk and bean bag is taken: send someone home first' });
+  const occupied = (id: string) => floor.workers.deskOccupied(id);
+  const dept = ask.department && DEPARTMENTS[ask.department];
+  const desk = ask.desk ?? (dept ? freeDepartmentDesk(dept, occupied) : nextFreeSeat(occupied, floor.plan.wing)?.id);
+  if (!desk) return send(res, 409, { error: dept ? `Both of ${dept.emoji} ${dept.name}'s desks are taken: send one of them home, or hire at another desk` : 'Every desk and bean bag is taken: send someone home first' });
   // A model or effort is the office's default worker's unless it says whose.
   const provider = ask.provider ?? (ask.model || ask.effort ? floor.workers.officeDefault.provider : undefined);
   const worktree = ask.worktree ?? !!floor.project.branch;
@@ -154,7 +159,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
   if (!ctx.floors.has(floor.id)) return send(res, 410, { error: 'This floor closed' });
   // It runs as whoever the asking worker runs as.
   const owner = floor.workers.ownerOf(me.id);
-  const r = floor.workers.spawn(desk, who, ask.prompt, worktree, 'agent', provider, ask.model, ask.effort, undefined, owner);
+  const r = floor.workers.spawn(desk, who, ask.prompt, worktree, 'agent', provider, ask.model, ask.effort, undefined, owner, [], hiredVia(me));
   if (typeof r === 'string') return send(res, 400, { error: r });
   ctx.toastFloor(floor, `${who} hired ${r.name}${ask.issue ? ` for issue #${ask.issue}` : ' with a task'}`);
   if (ask.issue) {

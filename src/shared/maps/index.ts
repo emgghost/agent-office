@@ -24,7 +24,7 @@ const STYLE_PROPS: Record<MapStyle, { kinds: Readonly<Record<string, string>>; f
   station: { kinds: STATION_PROP_KINDS, footprint: stationFootprint, top: stationTop },
 };
 
-const STATION_KINDS: readonly StationKind[] = ['issues', 'pulls', 'queue'];
+const STATION_KINDS: readonly StationKind[] = ['issues', 'pulls', 'queue', 'manager'];
 /** How far in from a table's edge a seat's place setting is; the worker sits 0.85 out from it (see deskSeat), on the bench. */
 const PLACE_IN = 0.35;
 /** How far out from a table's edge the middle of the bench down that side is. */
@@ -215,8 +215,21 @@ export function planMap(input: unknown): MapPlan {
 
   // The board agents' lecterns.
   if (!isObj(c.stations)) throw new MapError('it needs stations: where the Issues, PR and Queue agents stand');
+  /** The Queue agent's lectern, moved along its width to whichever side has room in the hall. */
+  const besideQueue = () => {
+    const q = place(c.stations.queue, 'stations.queue');
+    for (const side of [1.6, -1.6, 2.4, -2.4]) {
+      const x = q.x + Math.cos(q.rotY) * side;
+      const z = q.z - Math.sin(q.rotY) * side;
+      const out = (px: number, pz: number) => px < bounds.minX + 0.5 || px > bounds.maxX - 0.5 || pz < bounds.minZ + 0.5 || pz > bounds.maxZ - 0.5;
+      if (!out(x, z) && !out(x + Math.sin(q.rotY) * 0.9, z + Math.cos(q.rotY) * 0.9)) return { x, z, rotY: q.rotY };
+    }
+    return q;
+  };
+  const lecterns = c.stations;
   const stations: DeskDef[] = STATION_KINDS.map((kind) => {
-    const p = place(c.stations[kind], `stations.${kind}`);
+    // A map from before the manager had a lectern of its own: it stands beside the Queue agent's.
+    const p = kind === 'manager' && lecterns.manager === undefined ? besideQueue() : place(lecterns[kind], `stations.${kind}`);
     const def = { id: `station-${kind}`, station: kind, x: p.x, z: p.z, rotY: p.rotY, label: STATION_AGENT[kind].name };
     // The agent stands behind its lectern: that's in the hall too.
     inside(p.x + Math.sin(p.rotY) * 0.9, p.z + Math.cos(p.rotY) * 0.9, `where the ${STATION_AGENT[kind].name} stands`, 0);

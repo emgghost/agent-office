@@ -207,7 +207,7 @@ export const claude: ProviderAdapter<undefined, ClaudeSetup> = {
     if (info.model) args.push('--model', info.model);
     if (info.effort) args.push('--effort', info.effort);
     // The queue agent only ever adds to the queue: without these it can't touch the checkout's files.
-    if (station === 'queue') args.push('--disallowedTools', ...QUEUE_AGENT_DISALLOWED_TOOLS);
+    if (station === 'queue' || station === 'manager') args.push('--disallowedTools', ...QUEUE_AGENT_DISALLOWED_TOOLS);
     if (resumeSessionId) args.push('--resume', resumeSessionId);
     // `--` so a prompt like "- fix login" is never parsed as a CLI option.
     if (prompt) args.push('--', prompt);

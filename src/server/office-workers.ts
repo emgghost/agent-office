@@ -2,7 +2,7 @@
 // server (bin/office-workers.js) get from the /office/workers endpoint on the loopback hook port, and
 // how their requests are read. The endpoint itself is in server.ts, next to the board agents' queue.
 
-import { departmentOf } from '../shared/departments.js';
+import { DEPARTMENT_IDS, departmentOf, findDepartment, type DepartmentId } from '../shared/departments.js';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { AgentEffort, AgentProvider, GhPull, QueueTask, WorkerInfo, WorkerStatus, WorktreeCleanup } from '../shared/protocol.js';
@@ -143,6 +143,8 @@ export interface HireRequest {
   /** Its own git worktree; undefined leaves it to the office (yes, in a git checkout). */
   worktree?: boolean;
   desk?: string;
+  /** A department to hire in, at a free desk of its, instead of naming the desk (see shared/departments.ts). */
+  department?: DepartmentId;
   issue?: number;
 }
 
@@ -158,6 +160,9 @@ export function readHireRequest(body: unknown, providers: AgentProvider[]): Hire
   // Board kiosks and the meeting table seat their own: see station.prompt and meetings.ts.
   const seat = typeof b.desk === 'string' ? DESK_BY_ID.get(b.desk) : undefined;
   if (b.desk !== undefined && (!seat || seat.station || seat.room)) return "desk is a desk or bean bag's id, like desk-3";
+  const dept = typeof b.department === 'string' ? findDepartment(b.department) : undefined;
+  if (b.department !== undefined && !dept) return `department is one of ${DEPARTMENT_IDS.join(', ')}`;
+  if (dept && b.desk !== undefined) return 'Give desk or department, not both';
   if (b.issue !== undefined && !(Number.isSafeInteger(b.issue) && (b.issue as number) > 0)) return 'issue is an issue number';
   return {
     prompt,
@@ -166,6 +171,7 @@ export function readHireRequest(body: unknown, providers: AgentProvider[]): Hire
     ...(b.effort !== undefined ? { effort: b.effort as AgentEffort } : {}),
     ...(typeof b.worktree === 'boolean' ? { worktree: b.worktree } : {}),
     ...(typeof b.desk === 'string' ? { desk: b.desk } : {}),
+    ...(dept ? { department: dept.id } : {}),
     ...(b.issue !== undefined ? { issue: b.issue as number } : {}),
   };
 }
