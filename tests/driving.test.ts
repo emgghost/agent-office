@@ -146,6 +146,6 @@ test("flat out with no hands, the car rides the scenic loop's edges all the way 
     if (frame > 60 * 5) slowest = Math.min(slowest, car.speed);
   }
   assert.ok(furthest > LOOP_LENGTH - 20, `all the way round (${furthest.toFixed(0)} of ${LOOP_LENGTH.toFixed(0)} m)`);
-  assert.ok(lap !== null && lap > 60 && lap < 100, `a lap in ${lap?.toFixed(1)} s`);
+  assert.ok(lap !== null && lap > 25 && lap < 60, `a lap in ${lap?.toFixed(1)} s`);
   assert.ok(slowest > 10, `bumping round the bends, never stopped (slowest ${slowest.toFixed(1)} m/s)`);
 });

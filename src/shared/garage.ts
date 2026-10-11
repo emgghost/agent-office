@@ -104,18 +104,20 @@ export interface Pedals {
 }
 
 export const DRIVE = {
-  /** Flat out, forward and in reverse (m/s). */
-  top: 20,
+  /** Flat out, forward and in reverse (m/s): 150 km/h ahead. */
+  top: 150 / 3.6,
   reverse: 7,
   /** Speeding up, forward and back, and slowing down on the brake or rolling (m/s²). */
-  accel: 8,
+  accel: 10,
   reverseAccel: 5,
-  brake: 20,
+  brake: 30,
   coast: 2.5,
   /** Between the axles (m): how tight it turns. */
   wheelbase: 2.8,
   /** How far the front wheels turn at a crawl (radians): less the faster you go, so it doesn't spin out. */
   steer: 0.6,
+  /** Past this (m/s), the wheels turn no less: flat out, it still takes the scenic loop's bends. */
+  grip: 20,
   /** How fast they turn (radians a second). */
   steerRate: 2.8,
 } as const;
@@ -124,7 +126,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 /** How far the front wheels can turn at `speed`. */
 export function steerLimit(speed: number): number {
-  return DRIVE.steer / (1 + Math.abs(speed) / 9);
+  return DRIVE.steer / (1 + Math.min(DRIVE.grip, Math.abs(speed)) / 9);
 }
 
 /** The car `dt` seconds on, with these pedals: a bicycle model, no sliding. */

@@ -35,6 +35,7 @@ test('a car on the gas gets up to top speed and no faster, and rolls to a dead s
   assert.ok(p.speed > 12 && p.speed < DRIVE.top, `quick off the line (${p.speed.toFixed(1)} m/s after 2 s)`);
   p = run(p, GAS, 10);
   assert.equal(p.speed, DRIVE.top);
+  assert.equal(Math.round(DRIVE.top * 3.6), 150, '150 km/h flat out');
   assert.ok(Math.abs(p.x) < 1e-9 && p.z > 100, 'straight ahead, along its nose');
   p = run(p, COAST, 20);
   assert.equal(p.speed, 0, 'stopped, not creeping');
@@ -44,7 +45,7 @@ test('a car on the gas gets up to top speed and no faster, and rolls to a dead s
 
 test('the brake stops it quickly, and S brakes before it reverses', () => {
   const fast = { ...still(), speed: DRIVE.top };
-  assert.equal(run(fast, { ...GAS, brake: true }, 1.1).speed, 0, 'the brake beats the gas');
+  assert.equal(run(fast, { ...GAS, brake: true }, 1.5).speed, 0, 'the brake beats the gas');
   const back = { gas: -1, turn: 0, brake: false };
   const braking = run(fast, back, 0.5);
   assert.ok(braking.speed > 0 && braking.speed < fast.speed, 'still going forward, slower');
