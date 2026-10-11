@@ -11,6 +11,9 @@ import type { Parts } from '../../core/parts';
 import { store } from '../../state';
 import { closeAllModals, toast } from '../../ui/dom';
 import { wayTo } from './walkto';
+import { inHall } from '../../../shared/hall-plan';
+import { hallNav } from '../../../shared/hall';
+import { HALL } from '../../ui/elevator';
 
 /** Near enough to talk: where a walk over to someone ends. */
 const NEAR_ENOUGH = 1.6;
@@ -77,8 +80,18 @@ export function installWalking(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
     if (Math.hypot(at.x - player.pos.x, at.z - player.pos.z) < NEAR_ENOUGH && Math.abs(at.y - player.pos.y) < 1) return arrivedAt(at);
     if (now < walkingTo.replanAt) return;
     walkingTo.replanAt = now + 800;
-    // Round the office's rooms and up its stairs; on a map of its own, round what's in the way on its floor.
-    player.walkPath(inOffice() ? wayTo(player.pos, at, officeWing()) : ctx.world().nav.route([player.pos.x, player.pos.z], [at.x, at.z]).slice(1).map(([x, z]) => ({ x, z })));
+    // In the Departments hall and you're not (or the other way round): the lift first, then on over to them.
+    if (inOffice() && inHall(at.x, at.z) !== inHall(player.pos.x, player.pos.z)) return parts.travel.ride(inHall(at.x, at.z) ? HALL : store.floor!, true);
+    player.walkPath(pathTo(at));
+  }
+
+  /**
+   * The way to `to` on this floor: round the office's rooms and up its stairs, round the Departments
+   * hall's rooms when you're both in it, or on a map of its own, round what's in the way on its floor.
+   */
+  function pathTo(to: { x: number; y: number; z: number }) {
+    const grid = inOffice() && inHall(player.pos.x, player.pos.z) ? hallNav() : inOffice() ? null : ctx.world().nav;
+    return grid ? grid.route([player.pos.x, player.pos.z], [to.x, to.z]).slice(1).map(([x, z]) => ({ x, z })) : wayTo(player.pos, to, officeWing());
   }
 
   ctx.ticks.add('steer', ({ now }) => walkTick(now));
@@ -108,16 +121,17 @@ export function installWalking(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
    * ladder, driving a car) it just does it. A key of yours takes over, and then it doesn't happen.
    */
   function walkThen(at: { x: number; y?: number; z: number }, what: string, then: () => void, face?: { x: number; z: number }) {
-    if (core.upTop || core.trip || ctx.activities.running('climber') || ctx.activities.running('driver')) return then();
+    // Over the divide between the office and its Departments hall it's a lift ride away: from here too.
+    const across = inOffice() && inHall(at.x, at.z) !== inHall(player.pos.x, player.pos.z);
+    if (across || core.upTop || core.trip || ctx.activities.running('climber') || ctx.activities.running('driver')) return then();
     closeAllModals();
     if (player.seat) parts.seating.standUp();
     ctx.activities.stopAll('errand');
     if (walkingTo) stopWalking();
     errand = { at, what, face, then };
     toast(`🚶 Walking over to ${what}`);
-    const to = { x: at.x, y: at.y ?? 0, z: at.z };
-    // As walkTick does: round the office's rooms (and its back office), or round what's in the way on a map of its own.
-    player.walkPath(inOffice() ? wayTo(player.pos, to, officeWing()) : ctx.world().nav.route([player.pos.x, player.pos.z], [to.x, to.z]).slice(1).map(([x, z]) => ({ x, z })));
+    // As walkTick does.
+    player.walkPath(pathTo({ x: at.x, y: at.y ?? 0, z: at.z }));
   }
 
   function errandEnd(why: 'arrived' | 'cancelled' | 'stuck') {

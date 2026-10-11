@@ -7,7 +7,8 @@ import { scenic } from '../scenic';
 import { toon, toonUnique } from '../toon';
 import { elevator, garageLift } from '../elevator';
 import { gong } from '../../features/gong/world';
-import { departmentRooms, managerBooth } from '../../features/departments/world';
+import { managerBooth } from '../../features/departments/world';
+import { departmentHall } from '../../features/departments/hall';
 import { jukebox } from '../../features/jukebox/world';
 import { bookshelf } from '../../features/bookshelf/world';
 import { cabinet } from '../../features/cabinet/world';
@@ -52,7 +53,7 @@ function floorPlan() {
     desks,
     beanbags,
     kiosks,
-    departmentRooms,
+    departmentHall,
     managerBooth,
     boards,
     // The lounge: the TV, the couch and its table and poufs, and the jukebox and the arcade in the corner.

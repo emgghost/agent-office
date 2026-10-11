@@ -8,7 +8,7 @@ import { ROOF } from '../../shared/rooftop';
 import type { Arrival, Grip } from '../features/climbing/controller';
 import { lastSpot, store } from '../state';
 import { $, clip, closeAllModals, modalOpen, toast } from '../ui/dom';
-import { GARAGE, openElevator } from '../ui/elevator';
+import { GARAGE, HALL, openElevator } from '../ui/elevator';
 import type { Ctx, TripKind } from './context';
 import type { CoreState } from './ctx';
 import { builtFloors, floorWings } from './floors';
@@ -80,7 +80,7 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
   }
 
   function showElevator() {
-    openElevator({ net, ride, downstairs });
+    openElevator({ net, ride, downstairs, inHall: parts.place.inHallNow });
   }
 
   ctx.interactions.define('elevator', {
@@ -104,7 +104,8 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
 
   /** The elevator where you are: the office's, its stop down in the garage, or the one up on the roof. None on a map of its own. */
   function lift() {
-    if (!inOffice()) return null;
+    // The hall's lift doesn't open: the office's is the one that moves.
+    if (!inOffice() || parts.place.inHallNow()) return null;
     const roof = parts.rooftop.roof();
     return core.upTop && roof ? roof.elevator : downstairs() ? office.garageLift : office.elevator;
   }
@@ -116,6 +117,7 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
    * bottom floor's.
    */
   function ride(to: string, keepWalking = false): void {
+    if (to === HALL) return toHall();
     // A map of its own has no elevator: straight there, and no roof or garage to go to.
     if (!inOffice()) {
       if (to === ROOF || to === GARAGE) {
@@ -130,7 +132,8 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
     }
     const garage = to === GARAGE;
     const floorId = garage ? (core.upTop || !store.floor ? builtFloors()[0]?.id : store.floor) : to;
-    if (core.trip || !floorId || (floorId === store.floor && garage === downstairs())) return;
+    // From the Departments hall, your own floor is a ride back up to the office.
+    if (core.trip || !floorId || (floorId === store.floor && garage === downstairs() && !parts.place.inHallNow())) return;
     closeAllModals();
     stopForTrip();
     const inside = inElevator(player.pos.x, player.pos.z);
@@ -162,6 +165,36 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
   function stopForTrip() {
     ctx.activities.stopAll('trip', ['golf', 'thrower']);
     ctx.activities.stopAll('trip');
+  }
+
+  /**
+   * Over to the floor's Departments hall (see shared/hall-plan.ts): still the same floor, so it's a
+   * ride within it, as down to the garage is, and you step out of the hall's lift.
+   */
+  function toHall() {
+    if (!inOffice()) {
+      parts.walking.stopWalkingTo();
+      toast(`There's no Departments hall on this map (${plan().icon} ${plan().name}): it's the office's`, 'warn');
+      return;
+    }
+    if (core.trip || !store.floor || core.upTop || parts.place.inHallNow()) return;
+    closeAllModals();
+    stopForTrip();
+    const inside = inElevator(player.pos.x, player.pos.z);
+    core.trip = { floor: store.floor, how: 'elevator', garage: false, timer: window.setTimeout(tripFailed, 10_000) };
+    player.enabled = false;
+    player.clearKeys();
+    lift()?.setOpen(false);
+    setTimeout(
+      () => {
+        fade(true);
+        setTimeout(() => {
+          parts.place.placeInHall();
+          setTimeout(rodeWithin, 700);
+        }, 320);
+      },
+      inside ? 650 : 0,
+    );
   }
 
   /** Down to the garage under your floor, or back up from it: still the same floor, so the lights come up and the doors open. */

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR, SLAB, STREET_Y, WING, inWing, wingMinZ } from '../../shared/layout';
+import { HALL_BOUNDS, inHall } from '../../shared/hall-plan';
 import type { ViewMode } from '../state';
 import type { Collider } from '../world/types';
 import { ceilingAt, groundAt } from './collide';
@@ -77,6 +78,10 @@ export function aimCamera(camera: THREE.PerspectiveCamera, p: Followed, bob: num
   } else if (indoors) {
     cam.x = THREE.MathUtils.clamp(cam.x, R.minX + m, R.maxX - m);
     cam.z = THREE.MathUtils.clamp(cam.z, R.minZ + m, R.maxZ - m);
+  } else if (!R.enclosed && inHall(p.pos.x, p.pos.z)) {
+    // In the office's Departments hall, a lift ride from the room (see shared/hall-plan.ts): inside its walls.
+    cam.x = THREE.MathUtils.clamp(cam.x, HALL_BOUNDS.minX + m, HALL_BOUNDS.maxX - m);
+    cam.z = THREE.MathUtils.clamp(cam.z, HALL_BOUNDS.minZ + m, HALL_BOUNDS.maxZ - m);
   }
   const floorY = rigged ? 0 : Math.max(groundAt(p.colliders, p.pos.x, p.pos.z, p.pos.y), p.street);
   const roof = ceilingAt(p.colliders, cam.x, cam.z, floorY) - 0.3;

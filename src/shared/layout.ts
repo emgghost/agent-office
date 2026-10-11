@@ -2,6 +2,10 @@
 // Units are meters; +y is up. The office floor spans FLOOR.minX..maxX / minZ..maxZ at y = 0,
 // upstairs over a garage whose floor is level with the street (STREET_Y).
 
+import { HALL_DESKS } from './hall-plan.js';
+
+export { HALL, HALL_BOUNDS, inHall } from './hall-plan.js';
+
 export const FLOOR = { minX: -18, maxX: 18, minZ: -13, maxZ: 13 } as const;
 /** How high the ceiling is: a meter over the loft's roof (LOFT.y + LOFT.height), all the way across the room. */
 export const WALL_HEIGHT = 6.8;
@@ -200,7 +204,8 @@ export const MEETING_SEATS: DeskDef[] = (
 export const MEETING_BOARD = { x: MEETING_TABLE.x, y: 1.95, z: FLOOR.maxZ - 0.08, width: 3.6, height: 1.2 } as const;
 
 /** Any place a worker can be by id: the seats (the back office's included), the board agents' kiosks and the meeting room's chairs. */
-export const DESK_BY_ID = new Map([...SEATS, ...STATIONS, ...MEETING_SEATS].map((d) => [d.id, d]));
+// The Departments hall's desks too (see hall-plan.ts), which only departments hire at.
+export const DESK_BY_ID = new Map([...SEATS, ...STATIONS, ...MEETING_SEATS, ...HALL_DESKS].map((d) => [d.id, d]));
 
 /**
  * The seat a new worker takes when nobody picks one: the first free desk (in the back office too, as

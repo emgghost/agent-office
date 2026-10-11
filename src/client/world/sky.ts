@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FLOOR, SLAB, STREET_Y, WALL_HEIGHT, WALL_T, WING, wingMinZ } from '../../shared/layout';
+import { FLOOR, HALL, HALL_BOUNDS, SLAB, STREET_Y, WALL_HEIGHT, WALL_T, WING, inHall, wingMinZ } from '../../shared/layout';
 import type { SkyState, Theme, Weather } from '../../shared/protocol';
 import { guessPlace, skyNow, sunPosition } from '../../shared/sun';
 import type { NightParts } from './outside';
@@ -86,13 +86,14 @@ uniform float skySnow;
 uniform float skyClearRooms, skyDrop, skyStreet;
 uniform vec4 skyWing;
 
-// Inside the office's walls (and up through its open top), or the back office's, up to its ceiling
-// and no further: its roof, and the cornice over where the wall came down, are outdoors.
+// Inside the office's walls (and up through its open top), the back office's up to its ceiling (its
+// roof and the cornice over where the wall came down are outdoors), or the Departments hall's.
 float skyInOffice( vec3 p ) {
   vec3 d = max( ${v3(FLOOR.minX - 0.02, -0.06, FLOOR.minZ - 0.02)} - p, p - ${v3(FLOOR.maxX + 0.02, 40, FLOOR.maxZ + 0.02)} );
   vec3 w = max( vec3( skyWing.x, -0.06, skyWing.z ) - p, p - vec3( skyWing.y, ${(WALL_HEIGHT + 0.005).toFixed(3)}, skyWing.w ) );
+  vec3 h = max( ${v3(HALL_BOUNDS.minX - 0.4, -0.06, HALL_BOUNDS.minZ - 0.4)} - p, p - ${v3(HALL_BOUNDS.maxX + 0.4, HALL.height + 0.1, HALL_BOUNDS.maxZ + 0.4)} );
   float wing = length( max( w, 0.0 ) ) + step( ${(WALL_HEIGHT + 0.005).toFixed(3)}, p.y );
-  return 1.0 - smoothstep( 0.0, 0.12, min( length( max( d, 0.0 ) ), wing ) );
+  return 1.0 - smoothstep( 0.0, 0.12, min( min( length( max( d, 0.0 ) ), wing ), length( max( h, 0.0 ) ) ) );
 }
 
 // Under the bottom floor: walled at the back and on the west side, open to the street on the south and east.
@@ -375,9 +376,9 @@ function blobTexture(inner: number): THREE.CanvasTexture {
 /** The back office, walls included, when the floor you're on is built out into one (see Sky.setWing). */
 let wingBox: { minX: number; maxX: number; minZ: number; maxZ: number } | null = null;
 
-/** Is (x, z) under the building, where no rain or snow falls? */
+/** Is (x, z) under the building (or the Departments hall's roof), where no rain or snow falls? */
 const sheltered = (x: number, z: number) =>
-  (x > B.minX - 0.05 && x < B.maxX + 0.05 && z > B.minZ - 0.05 && z < B.maxZ + 0.05) || (!!wingBox && x > wingBox.minX - 0.05 && x < wingBox.maxX + 0.05 && z > wingBox.minZ - 0.05 && z < wingBox.maxZ);
+  (x > B.minX - 0.05 && x < B.maxX + 0.05 && z > B.minZ - 0.05 && z < B.maxZ + 0.05) || (!!wingBox && x > wingBox.minX - 0.05 && x < wingBox.maxX + 0.05 && z > wingBox.minZ - 0.05 && z < wingBox.maxZ) || inHall(x, z);
 
 export class Sky {
   private preview: { hour?: number; weather?: Weather; intensity?: number } = {};
@@ -618,7 +619,7 @@ export class Sky {
   /** How lit it is at `p`, 0–1 (1 is a clear day, or a room with its lights on), for your hands. */
   lightAt(p: THREE.Vector3): number {
     if (this.indoors) return 1;
-    const inside = !this.roof && ((p.x > FLOOR.minX && p.x < FLOOR.maxX && p.z > FLOOR.minZ && p.z < FLOOR.maxZ) || (sheltered(p.x, p.z) && (p.y < 0 || p.z < FLOOR.minZ)));
+    const inside = !this.roof && ((p.x > FLOOR.minX && p.x < FLOOR.maxX && p.z > FLOOR.minZ && p.z < FLOOR.maxZ) || (sheltered(p.x, p.z) && (p.y < 0 || p.z < FLOOR.minZ)) || inHall(p.x, p.z));
     if (inside) return 1;
     let lamp = 0;
     if (!this.roof) {

@@ -17,6 +17,8 @@ import { confirmDialog } from './prompt';
  * one you're on (from the roof, the bottom one), level with the street.
  */
 export const GARAGE = '@garage';
+/** The floor's Departments hall (see shared/hall-plan.ts): a stop of the floor you're on, like the garage. */
+export const HALL = '@hall';
 
 export interface ElevatorOptions {
   net: Net;
@@ -24,6 +26,8 @@ export interface ElevatorOptions {
   ride(floorId: string): void;
   /** You're down in the garage (or out on the street), under the floor you're on. */
   downstairs(): boolean;
+  /** You're in your floor's Departments hall. */
+  inHall(): boolean;
 }
 
 /** How many repositories the list shows at once; typing narrows it down. */
@@ -118,9 +122,9 @@ export function openElevator(opts: ElevatorOptions): void {
   const choice = (): string | undefined => selected ?? normalizeRepo(filter);
 
   const floorButton = (f: FloorInfo, i: number) => {
-    // Down in the garage, your floor is somewhere to go back up to.
+    // Down in the garage, or in the Departments hall, your floor is somewhere to go back up to.
     const mine = f.id === store.floor;
-    const here = mine && !opts.downstairs();
+    const here = mine && !opts.downstairs() && !opts.inHall();
     const p = floorPalette(f.palette);
     const stats: (HTMLElement | string)[] = [];
     if (f.cloning) stats.push(h('span', { title: f.clone?.detail ?? 'Being cloned' }, cloneLabel(f.clone)));
@@ -194,6 +198,24 @@ export function openElevator(opts: ElevatorOptions): void {
     return btn;
   };
 
+  /** Your floor's Departments hall, where its departments sit: only from a floor (not the roof). */
+  const hallButton = () => {
+    const here = opts.inHall();
+    const btn = h(
+      'button.floor-btn',
+      { type: 'button', class: here ? 'here' : '', disabled: here, title: here ? "You're in this floor's Departments hall" : "Ride to this floor's Departments hall" },
+      h('span.floor-no', { style: 'background:#1d3557' }, '🏢'),
+      h('span.floor-text', {}, h('span.floor-name', {}, 'Departments', here ? h('span.here-tag', {}, 'you are here') : null), h('span.floor-sub', {}, `${store.currentFloor()?.name ?? 'This floor'}'s ten departments, four desks each`)),
+      h('span.floor-stats', {}),
+    );
+    btn.addEventListener('click', () => {
+      if (here) return;
+      modal.close();
+      opts.ride(HALL);
+    });
+    return btn;
+  };
+
   /** Under floor 1: the garage, level with the street. */
   const garageButton = () => {
     const here = opts.downstairs();
@@ -221,6 +243,7 @@ export function openElevator(opts: ElevatorOptions): void {
     floorsEl.replaceChildren(
       ...(built ? [roofButton()] : []),
       ...(floors.length ? floors.map(floorRow).reverse() : [h('p.empty', {}, 'No floors yet.')]),
+      ...(store.floor && store.floor !== ROOF ? [hallButton()] : []),
       ...(built ? [garageButton()] : []),
     );
   };

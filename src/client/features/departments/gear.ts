@@ -108,18 +108,6 @@ const GEAR: Record<DepartmentId, (g: THREE.Group, d: DepartmentDef) => void> = {
       g.add(mesh(new THREE.ConeGeometry(0.035, 0.09, 6), gold, Math.sin(a) * 0.15, 1.07, Math.cos(a) * 0.15, false));
     }
   },
-  // A tie, and a pencil behind the ear.
-  pm: (g) => {
-    const tie = onBean(new THREE.Group(), 0.43, 0, 0.005);
-    tie.add(mesh(new THREE.BoxGeometry(0.06, 0.05, 0.02), toon('#ffd166'), 0, 0.04, 0, false));
-    const blade = mesh(new THREE.ConeGeometry(0.05, 0.2, 4), toon('#ffd166'), 0, -0.08, 0, false);
-    blade.rotation.set(Math.PI, Math.PI / 4, 0);
-    tie.add(blade);
-    g.add(tie);
-    const pencil = mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), toon('#ffb703'), 0.3, 0.8, -0.02, false);
-    pencil.rotation.z = Math.PI / 2.6;
-    g.add(pencil);
-  },
   // A beret, tipped to one side, with its little stalk.
   design: (g, d) => {
     // A squashed ball over the top of the head, overhanging it the way a beret does.
@@ -129,22 +117,58 @@ const GEAR: Record<DepartmentId, (g: THREE.Group, d: DepartmentDef) => void> = {
     g.add(beret);
     g.add(mesh(new THREE.CylinderGeometry(0.012, 0.02, 0.06, 6), toon(d.color), 0.1, 1.04, 0, false));
   },
-  // A sweatband, and a whistle on a lanyard.
-  scrum: (g) => {
-    const band = mesh(new THREE.TorusGeometry(0.29, 0.04, 8, 28), toon('#ffffff'), 0, 0.85, 0, false);
+  // A hard hat, with its brim all round.
+  devops: (g) => {
+    g.add(dome('#ffd166', 0.83, 0.31));
+    const brim = mesh(new THREE.CylinderGeometry(0.37, 0.37, 0.025, 24), toon('#f4a261'), 0, 0.83, 0.02, false);
+    g.add(brim);
+    g.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 0.5), toon('#f4a261'), 0, 0.99, 0, false));
+  },
+  // A tie, and round glasses.
+  techlead: (g) => {
+    const ink = toon('#14213d');
+    for (const sx of [-1, 1]) {
+      const rim = onBean(new THREE.Group(), 0.7, sx * 0.4, 0.035);
+      rim.add(mesh(new THREE.TorusGeometry(0.075, 0.012, 6, 18), ink, 0, 0, 0, false));
+      g.add(rim);
+    }
+    g.add(mesh(new THREE.BoxGeometry(0.06, 0.012, 0.012), ink, 0, 0.71, 0.29, false));
+    const tie = onBean(new THREE.Group(), 0.43, 0, 0.005);
+    tie.add(mesh(new THREE.BoxGeometry(0.06, 0.05, 0.02), toon('#e9c46a'), 0, 0.04, 0, false));
+    const blade = mesh(new THREE.ConeGeometry(0.05, 0.2, 4), toon('#e9c46a'), 0, -0.08, 0, false);
+    blade.rotation.set(Math.PI, Math.PI / 4, 0);
+    tie.add(blade);
+    g.add(tie);
+  },
+  // A scarf round the neck, and a quill tucked behind the ear.
+  content: (g) => {
+    const scarf = mesh(new THREE.TorusGeometry(0.27, 0.05, 8, 28), toon('#ffffff'), 0, 0.46, 0, false);
+    scarf.rotation.x = Math.PI / 2;
+    g.add(scarf);
+    const tail = onBean(new THREE.Group(), 0.38, 0.35, 0.03);
+    tail.add(mesh(new THREE.BoxGeometry(0.08, 0.18, 0.03), toon('#ffffff'), 0, -0.04, 0, false));
+    g.add(tail);
+    const quill = mesh(new THREE.ConeGeometry(0.035, 0.32, 6), toon('#fefae0'), 0.28, 0.9, -0.05, false);
+    quill.rotation.z = -0.5;
+    g.add(quill);
+  },
+  // An editor's green eyeshade, and a pencil behind the ear.
+  docs: (g) => {
+    const band = mesh(new THREE.TorusGeometry(0.29, 0.02, 6, 28), toon('#2b2d42'), 0, 0.84, 0, false);
     band.rotation.x = Math.PI / 2;
     g.add(band);
-    const lanyard = mesh(new THREE.TorusGeometry(0.27, 0.01, 4, 28), detail('#e63946'), 0, 0.45, 0.02, false);
-    lanyard.rotation.x = Math.PI / 2.4;
-    g.add(lanyard);
-    const whistle = onBean(new THREE.Group(), 0.36, 0.25, 0.03);
-    whistle.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 10), toon('#adb5bd'), 0, 0, 0, false));
-    g.add(whistle);
+    const shade = mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.015, 20, 1, false, -Math.PI / 2, Math.PI), detail('#52b788'), 0, 0.85, 0.24, false);
+    shade.rotation.x = -0.25;
+    shade.scale.z = 1.4;
+    g.add(shade);
+    const pencil = mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), toon('#ffb703'), 0.3, 0.8, -0.02, false);
+    pencil.rotation.z = Math.PI / 2.6;
+    g.add(pencil);
   },
 };
 
 /** The gear that goes on the head, which gives way to an elf's hat at Christmas. */
-const HEADWEAR: ReadonlySet<DepartmentId> = new Set(['backend', 'frontend', 'po', 'design', 'scrum']);
+const HEADWEAR: ReadonlySet<DepartmentId> = new Set(['backend', 'frontend', 'po', 'design', 'devops', 'docs']);
 
 /** What a worker in department `d` wears: its kit (without what goes on its head, `hats` false) and its badge. */
 export function departmentGear(d: DepartmentDef, hats = true): THREE.Group {

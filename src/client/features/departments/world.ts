@@ -1,19 +1,19 @@
 import * as THREE from 'three';
-import { MANAGER_BOOTH, ROOMS, ROOM_DOOR, ROOM_HEIGHT, roomDoor, roomKit, type DepartmentId, type RoomDef } from '../../../shared/departments';
+import { MANAGER_BOOTH, ROOM_DOOR, ROOM_HEIGHT, type DepartmentId } from '../../../shared/departments';
 import { canvasTexture } from '../../world/texture';
 import { mesh, roundedBox, textPlane, toon } from '../../world/toon';
 import type { Fixture, Site } from '../../world/office/fixture';
 import { PALETTE, box, glassPane } from '../../world/office/materials';
 import { floorPlant, plant } from '../../world/office/props';
 
-// The departments' rooms (shared/departments.ts): glass walls framed in each department's color round
-// its row of two desks, with a door behind the chairs that slides open as anyone comes up to it, its
-// own floor, its name over the door and the kit of its trade in the corner.
+// What the departments' rooms are made of (built in the Departments hall, see hall.ts): runs of glass
+// framed in each department's color, doors that slide open as anyone comes up to them, and the kit of
+// each one's trade; and the Manager's booth in the office, made of the same glass.
 
 const T = 0.08;
 
 /** A run of glass `H` high from (x0, z0) to (x1, z1), one axis held, in panes about 1.4 wide, framed in `frame`, and what's in its way. */
-function glassRun(site: Site, frame: THREE.Material, x0: number, z0: number, x1: number, z1: number, H = ROOM_HEIGHT) {
+export function glassRun(site: Site, frame: THREE.Material, x0: number, z0: number, x1: number, z1: number, H = ROOM_HEIGHT) {
   const alongX = z0 === z1;
   const len = alongX ? x1 - x0 : z1 - z0;
   if (len <= 0.05) return;
@@ -41,7 +41,7 @@ function glassRun(site: Site, frame: THREE.Material, x0: number, z0: number, x1:
 }
 
 /** A door at (dx, z) in a wall `H` high along x, `out` the way out of it: two glass leaves that slide apart over the glass either side, as the meeting room's do. */
-function door(site: Site, dx: number, z: number, out: 1 | -1, frame: THREE.Material, H = ROOM_HEIGHT) {
+export function door(site: Site, dx: number, z: number, out: 1 | -1, frame: THREE.Material, H = ROOM_HEIGHT) {
   const half = ROOM_DOOR / 2;
   const h = Math.min(2.2, H - 0.15);
   const leaves: [THREE.Group, number][] = [];
@@ -110,7 +110,7 @@ function columns(titles: string[], colors: string[], notes: number[][]) {
 }
 
 /** The kit of each department's trade, standing in its room's corner facing in (+z here). */
-const KIT: Record<DepartmentId, () => THREE.Group> = {
+export const KIT: Record<DepartmentId, () => THREE.Group> = {
   // A server rack with its lights blinking green and red, and a padlock on its door.
   security: () => {
     const g = new THREE.Group();
@@ -171,24 +171,6 @@ const KIT: Record<DepartmentId, () => THREE.Group> = {
     }),
   // A roadmap: now, next, later.
   po: () => standBoard(columns(['Now', 'Next', 'Later'], ['#cdb4db', '#ffc8dd', '#bde0fe', '#a2d2ff'], [[0, 50, 100], [0, 50, 100, 150], [0, 50]])),
-  // A plan of who does what when: bars on a timeline.
-  pm: () =>
-    standBoard((g, w, h) => {
-      g.fillStyle = '#ffffff';
-      g.fillRect(0, 0, w, h);
-      g.strokeStyle = '#dee2e6';
-      for (let x = 20; x < w; x += 36) {
-        g.beginPath();
-        g.moveTo(x, 20);
-        g.lineTo(x, h - 20);
-        g.stroke();
-      }
-      const bars = [[20, 90], [70, 110], [100, 70], [150, 70], [60, 140], [180, 40]];
-      bars.forEach(([x, len], i) => {
-        g.fillStyle = ['#2d6a4f', '#40916c', '#74c69d', '#95d5b2'][i % 4];
-        g.fillRect(x, 34 + i * 44, len, 26);
-      });
-    }),
   // An easel with swatches on its canvas.
   design: () => {
     const g = new THREE.Group();
@@ -222,44 +204,80 @@ const KIT: Record<DepartmentId, () => THREE.Group> = {
     g.add(mesh(box(0.8, 0.04, 0.08), wood, 0, 0.93, 0.2, false));
     return g;
   },
-  // The sprint board.
-  scrum: () => standBoard(columns(['To do', 'Doing', 'Done'], ['#ffe066', '#ffd43b', '#fab005', '#ffec99'], [[0, 50, 100, 150], [0, 50], [0, 50, 100]])),
-};
-
-/** One department's room. */
-function room(site: Site, r: RoomDef) {
-  const frame = toon(r.dept.color);
-  // Its own floor, over the rug the desks stand on.
-  site.group.add(mesh(roundedBox(r.maxX - r.minX - 0.12, 0.012, r.maxZ - r.minZ - 0.12, 0.25), toon(r.dept.floor), (r.minX + r.maxX) / 2, 0.016, (r.minZ + r.maxZ) / 2, false));
-  // Its sides, and the wall with its door; the desks' spine is shared with the room behind it, so only one of the two puts it up.
-  glassRun(site, frame, r.minX, r.minZ, r.minX, r.maxZ);
-  glassRun(site, frame, r.maxX, r.minZ, r.maxX, r.maxZ);
-  const { x: dx } = roomDoor(r);
-  glassRun(site, frame, r.minX, r.doorZ, dx - ROOM_DOOR / 2, r.doorZ);
-  glassRun(site, frame, dx + ROOM_DOOR / 2, r.doorZ, r.maxX, r.doorZ);
-  if (r.out < 0) glassRun(site, toon('#ffffff'), r.minX, r.spineZ, r.maxX, r.spineZ);
-  door(site, dx, r.doorZ, r.out, frame);
-  // Its name over the door, outside and in.
-  for (const side of [1, -1]) {
-    const label = textPlane(`${r.dept.emoji} ${r.dept.name}`, { bg: r.dept.color, color: '#ffffff', size: 56, border: '#ffffff' });
-    label.scale.multiplyScalar(0.5);
-    label.position.set(dx, 2.42, r.doorZ + side * r.out * (T / 2 + 0.03));
-    label.rotation.y = side * r.out > 0 ? 0 : Math.PI;
-    site.group.add(label);
-  }
-  // Its kit, in the corner away from the next room along, facing the desks.
-  const at = roomKit(r);
-  const kit = KIT[r.dept.id]();
-  kit.position.set(at.x, 0, at.z);
-  kit.rotation.y = at.facing;
-  site.group.add(kit);
-  site.colliders.push({ minX: at.x - at.half, maxX: at.x + at.half, minZ: at.z - at.half, maxZ: at.z + at.half, top: 1.8 });
-}
-
-/** Every department's room, round its desks. */
-export const departmentRooms: Fixture = (site) => {
-  for (const r of ROOMS) room(site, r);
-  return {};
+  // The pipeline: build, test, release, a tick for each stage that passed.
+  devops: () =>
+    standBoard((g, w) => {
+      g.fillStyle = '#0b1f14';
+      g.fillRect(0, 0, w, 315);
+      g.font = '800 22px Nunito, system-ui, sans-serif';
+      g.textAlign = 'left';
+      ['build', 'test', 'lint', 'package', 'release'].forEach((stage, i) => {
+        const y = 40 + i * 56;
+        g.fillStyle = i < 4 ? '#2b9348' : '#f9c74f';
+        g.beginPath();
+        g.arc(34, y, 14, 0, Math.PI * 2);
+        g.fill();
+        if (i < 4) g.fillRect(31, y + 14, 6, 28);
+        g.fillStyle = '#e9f5db';
+        g.fillText(`${i < 4 ? '✓' : '…'} ${stage}`, 60, y + 8);
+      });
+    }),
+  // A sheet of Persian copy being written, right to left, with its length counted.
+  content: () =>
+    standBoard((g, w, h) => {
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, w, h);
+      g.direction = 'rtl';
+      g.textAlign = 'right';
+      g.fillStyle = '#023e8a';
+      g.font = '800 26px Tahoma, Vazirmatn, sans-serif';
+      g.fillText('متن پیام', w - 16, 40);
+      g.font = '18px Tahoma, Vazirmatn, sans-serif';
+      g.fillStyle = '#2b2d42';
+      ['سلام {{name}} عزیز،', 'کد تخفیف شما آماده است.', 'تا پایان هفته معتبر است.'].forEach((line, i) => g.fillText(line, w - 16, 84 + i * 34));
+      g.fillStyle = '#90e0ef';
+      for (let i = 0; i < 4; i++) g.fillRect(16 + (i % 2) * 40, 200 + i * 22, w - 60 - (i % 2) * 40, 8);
+      g.direction = 'ltr';
+      g.textAlign = 'left';
+      g.font = '700 16px Nunito, system-ui, sans-serif';
+      g.fillStyle = '#6c757d';
+      g.fillText('62 / 70', 16, h - 16);
+    }),
+  // A short bookcase of the project's docs.
+  docs: () => {
+    const g = new THREE.Group();
+    const wood = toon('#8d6e63');
+    g.add(mesh(box(0.8, 1.3, 0.34), wood, 0, 0.65, 0));
+    const spines = ['#e63946', '#3a86ff', '#ffb703', '#2a9d8f', '#8338ec', '#fb8500', '#1d3557'];
+    for (const [shelf, y] of [[0, 0.32], [1, 0.74], [2, 1.12]] as const) {
+      g.add(mesh(box(0.72, 0.03, 0.3), toon('#6d4c41'), 0, y - 0.17, 0.02, false));
+      for (let i = 0; i < 6; i++) {
+        const tall = 0.24 + ((i * 7 + shelf * 3) % 5) * 0.02;
+        g.add(mesh(box(0.08, tall, 0.22), toon(spines[(i + shelf * 2) % spines.length]), -0.27 + i * 0.105, y - 0.15 + tall / 2, 0.05, false));
+      }
+    }
+    return g;
+  },
+  // The architecture: boxes and the arrows between them.
+  techlead: () =>
+    standBoard((g, w, h) => {
+      g.fillStyle = '#f8f9fa';
+      g.fillRect(0, 0, w, h);
+      g.strokeStyle = '#1d3557';
+      g.lineWidth = 3;
+      const boxes: [number, number][] = [[20, 30], [130, 30], [75, 135], [20, 235], [130, 235]];
+      for (const [x, y] of boxes) {
+        g.fillStyle = '#dbe4f0';
+        g.fillRect(x, y, 90, 50);
+        g.strokeRect(x, y, 90, 50);
+      }
+      for (const [a, b] of [[0, 2], [1, 2], [2, 3], [2, 4]] as const) {
+        g.beginPath();
+        g.moveTo(boxes[a][0] + 45, boxes[a][1] + 50);
+        g.lineTo(boxes[b][0] + 45, boxes[b][1]);
+        g.stroke();
+      }
+    }),
 };
 
 /**

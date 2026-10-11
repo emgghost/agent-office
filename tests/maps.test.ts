@@ -4,16 +4,18 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { CASTLE } from '../src/shared/maps/castle.js';
 import { STATION } from '../src/shared/maps/station.js';
+import { isHallDesk } from '../src/shared/hall-plan.js';
 import { DESK_BY_ID } from '../src/shared/layout.js';
 import { NavGrid, pathLength } from '../src/shared/nav.js';
 import { BUILTIN_MAPS, DEFAULT_DAIS, OFFICE_PLAN, checkCustomMaps, mapChoices, planMap, planOf, seatHereOn, type MapConfig } from '../src/shared/maps/index.js';
 import { clockWork, workedMs } from '../src/server/workers.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
 
-test('every built-in map places every seat the office has, by the same ids', () => {
+test("every built-in map places every seat the office has, by the same ids, but the Departments hall's, which is the office's own", () => {
+  const seats = [...DESK_BY_ID.keys()].filter((id) => !isHallDesk(id));
   for (const config of BUILTIN_MAPS) {
     const plan = planMap(config);
-    assert.deepEqual(new Set(plan.byId.keys()), new Set(DESK_BY_ID.keys()), `${config.id} has the office's seats`);
+    assert.deepEqual(new Set(plan.byId.keys()), new Set(seats), `${config.id} has the office's seats`);
     for (const [id, d] of plan.byId) {
       const office = DESK_BY_ID.get(id)!;
       assert.equal(!!d.station, !!office.station, `${id} is a kiosk on both`);

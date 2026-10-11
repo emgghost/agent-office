@@ -19,9 +19,10 @@ const USAGE = `Usage:
   office-workers hire [options] <<'EOF'         hire a worker at a free desk; its task on stdin
   …the task…                                    (or --prompt "…"). Options: --provider <name>
   EOF                                           --model <m> --effort <e> --desk <id> --issue <n>
-                                                --no-worktree --department <name> (security, qa,
-                                                backend, frontend, po, pm, design, scrum: a free
-                                                desk of that department, and its role)
+                                                --no-worktree --department <name> (backend,
+                                                frontend, qa, security, devops, po, design,
+                                                content, docs, techlead: a free desk of that
+                                                department in the Departments hall, and its role)
   office-workers home <name|id>... [--cleanup auto|keep|worktree|all]
                                                 send workers home. auto (the default) deletes each
                                                 one's worktree and branch unless they hold work
@@ -43,9 +44,10 @@ const USAGE = `Usage:
   …the question…                                ask another worker something you can't find out
   EOF                                           yourself (or --question "…"); waits up to 45s
                                                 for the answer, else it's typed into your terminal
-  office-workers ask --department <name> …      ask a department instead (security, qa, backend,
-                                                frontend, po, pm, design, scrum): whoever is there,
-                                                or someone hired there for it
+  office-workers ask --department <name> …      ask a department instead (backend, frontend, qa,
+                                                security, devops, po, design, content, docs,
+                                                techlead): whoever is there, or someone hired
+                                                there for it
   office-workers answer <id> <<'EOF'            answer a question asked of you (or --answer "…")
   …the answer…
   EOF
@@ -394,7 +396,7 @@ export const TOOLS = [
         desk: { type: 'string', description: 'A desk or bean bag id (desk-3). Default: the next free one.' },
         department: {
           type: 'string',
-          enum: ['security', 'qa', 'backend', 'frontend', 'po', 'pm', 'design', 'scrum'],
+          enum: ['backend', 'frontend', 'qa', 'security', 'devops', 'po', 'design', 'content', 'docs', 'techlead'],
           description: "Hire it in a department instead of naming a desk: at a free desk of that department's, where it starts in the department's role.",
         },
         issue: { type: 'integer', minimum: 1, description: 'The GitHub issue it works on, assigned when it starts.' },
@@ -490,7 +492,7 @@ export const TOOLS = [
     name: 'ask_worker',
     title: 'Ask a worker',
     description:
-      "Asks another worker in this office a question, or a department (security, qa, backend, frontend, po, pm, design, scrum), when you need to know something you can't find out yourself: what another worker changed or decided, " +
+      "Asks another worker in this office a question, or a department (backend, frontend, qa, security, devops, po, design, content, docs, techlead), when you need to know something you can't find out yourself: what another worker changed or decided, " +
       "how something in its part works, information only it has access to. The office types the question into that worker's terminal once it's free (it carries on with its own task after answering). " +
       "Waits up to 45 seconds for the answer; when it comes later, it's typed into your terminal as your next message, so carry on with what doesn't need it. " +
       WORKER_NOTE,
@@ -500,7 +502,7 @@ export const TOOLS = [
         worker: { type: 'string', description: 'Who to ask, by name or id. Leave it out to ask a department.' },
         department: {
           type: 'string',
-          enum: ['security', 'qa', 'backend', 'frontend', 'po', 'pm', 'design', 'scrum'],
+          enum: ['backend', 'frontend', 'qa', 'security', 'devops', 'po', 'design', 'content', 'docs', 'techlead'],
           description: "A department to ask instead of a worker: whoever is in it answers, and when nobody is, the office hires someone there for the question (list_workers shows each worker's department).",
         },
         question: { type: 'string', description: 'The question, complete on its own: the other worker knows nothing of your task.' },
