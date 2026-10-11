@@ -52,12 +52,12 @@ export class Motors {
       const v = Math.abs(e.speed);
       const push = Math.abs(e.gas);
       // Up through the gears: the revs climb in each one and drop back as it shifts up.
-      const gear = Math.min(3, Math.floor(v / 5.5));
-      const f = 44 + gear * 7 + Math.min(1.5, (v - gear * 5.5) / 5.5) * 46 + push * 5;
+      const gear = Math.min(5, Math.floor(v / 7));
+      const f = 44 + gear * 7 + Math.min(1.5, (v - gear * 7) / 7) * 46 + push * 5;
       m.saw.frequency.setTargetAtTime(f, now, 0.06);
       m.sub.frequency.setTargetAtTime(f / 2, now, 0.06);
       m.tone.frequency.setTargetAtTime(240 + f * 5 + push * 450, now, 0.08);
-      m.gain.gain.setTargetAtTime(0.035 + 0.04 * push + 0.025 * Math.min(1, v / 20), now, 0.1);
+      m.gain.gain.setTargetAtTime(0.035 + 0.04 * push + 0.025 * Math.min(1, v / 30), now, 0.1);
     }
     for (const [car, m] of this.motors) {
       if (on.has(car)) continue;
