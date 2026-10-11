@@ -31,7 +31,7 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['F', 'Hang a picture from the web on a wall. Look at a picture and press E to move, edit or take it down'],
   ['Q', 'Put back the issue card in your hands (E at a note on the issues board, or ✋ Pick it up in an issue; then E at an empty desk, a worker or the queue board), or drop the basketball'],
   ['💼', 'The Manager, at its desk at the foot of the stairs up to the boss office: press E there and tell it what you want. It hires the departments, keeps them moving and reports back to you; O there opens its terminal'],
-  ['🏢', 'Departments: the desks are eight glass rooms (Security, QA, Backend, Frontend, Product Owner, Project Manager, Designer, Scrum Master). A worker hired in one wears its gear and starts in its role, and the others can ask it questions'],
+  ['🏢', 'The Departments hall: ride the elevator to 🏢 Departments. Ten glass rooms of four desks each (Backend, Frontend, QA, Security, DevOps, Product Owner, Designer, Persian Content, Technical Writer, Tech Lead). A worker hired in one wears its gear and starts in its role, and the others can ask it questions. E at the lift in its lobby takes you back up'],
   ['🎓', 'Lessons (☰ → Lessons): the rules this project’s workers have learned, mostly from being corrected. Every worker hired on the floor starts with them. Correct a worker about how things are done here and it records one; reword or take any off there'],
   ['🐶', 'Walk up to the office dog and press E to pet it. When a worker needs input, it runs to that desk and barks. Name it in ⚙️ Settings'],
   ['O', 'Open a pull request for a worker on its own branch, or see the one it has'],

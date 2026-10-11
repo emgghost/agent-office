@@ -1,14 +1,17 @@
-// The office's departments: a glass-walled room round each row of two desks (see DESKS in layout.ts),
-// for the roles a software company has. A worker hired at a department's desk wears its color and
-// gear and starts with its role's brief (the 'dept.<id>' prompts, editable in ⚙️ Settings); another
-// worker can ask a department something and the office finds, or hires, someone there to answer.
-// The rooms are only built on the office's own map (features/departments/world.ts); on the others the
-// desks still belong to their departments.
+// The office's departments, the roles a software company has, each in a glass room of four desks in
+// its floor's Departments hall (see shared/hall-plan.ts, which the elevator goes to). A worker hired
+// at a department's desk wears its color and gear and starts with its role's brief (the 'dept.<id>'
+// prompts, editable in ⚙️ Settings); another worker can ask a department something, and the office
+// finds, or hires, someone there to answer. The hall is only built on the office's own map; on the
+// others its desks aren't anywhere, so nobody's hired at them there.
 
-import { DESKS, DESK_SIZE, STATIONS, deskSeat, type DeskDef } from './layout.js';
+import { STATIONS } from './layout.js';
 
-export const DEPARTMENT_IDS = ['security', 'qa', 'backend', 'frontend', 'po', 'pm', 'design', 'scrum'] as const;
+export const DEPARTMENT_IDS = ['backend', 'frontend', 'qa', 'security', 'devops', 'po', 'design', 'content', 'docs', 'techlead'] as const;
 export type DepartmentId = (typeof DEPARTMENT_IDS)[number];
+
+/** How many desks each department has in the hall. */
+export const DEPARTMENT_SEATS = 4;
 
 export interface DepartmentDef {
   id: DepartmentId;
@@ -20,110 +23,93 @@ export interface DepartmentDef {
   floor: string;
   /** What it does, in a line: the hire window and the department list say it. */
   does: string;
-  /** Its two desks, in DESKS. */
-  desks: readonly [string, string];
+  /** Its desks in the hall (hall-plan.ts names them the same way). */
+  desks: readonly string[];
 }
 
+const dept = (id: DepartmentId, name: string, emoji: string, color: string, floor: string, does: string): DepartmentDef => ({
+  id,
+  name,
+  emoji,
+  color,
+  floor,
+  does,
+  desks: Array.from({ length: DEPARTMENT_SEATS }, (_, i) => `hall-${id}-${i + 1}`),
+});
+
 export const DEPARTMENTS: Record<DepartmentId, DepartmentDef> = {
-  security: { id: 'security', name: 'Security', emoji: '🛡️', color: '#e63946', floor: '#fbd5d8', does: 'Finds and fixes vulnerabilities, reviews code and dependencies for risks', desks: ['desk-1', 'desk-2'] },
-  qa: { id: 'qa', name: 'QA', emoji: '🧪', color: '#2a9d8f', floor: '#cdeee9', does: 'Writes and runs tests, reproduces bugs, checks that changes really work', desks: ['desk-3', 'desk-4'] },
-  backend: { id: 'backend', name: 'Backend', emoji: '⚙️', color: '#3a86ff', floor: '#d3e3ff', does: 'Servers, APIs, data and performance', desks: ['desk-5', 'desk-6'] },
-  frontend: { id: 'frontend', name: 'Frontend', emoji: '🖥️', color: '#fb8500', floor: '#ffe3c2', does: 'The UI: pages, components, styles and accessibility', desks: ['desk-7', 'desk-8'] },
-  po: { id: 'po', name: 'Product Owner', emoji: '🧭', color: '#8338ec', floor: '#e5d6fb', does: 'Turns needs into user stories with acceptance criteria, and keeps the backlog in order', desks: ['desk-9', 'desk-10'] },
-  pm: { id: 'pm', name: 'Project Manager', emoji: '📅', color: '#2d6a4f', floor: '#d3eadc', does: 'Plans the work, tracks progress and risks, and reports where things stand', desks: ['desk-11', 'desk-12'] },
-  design: { id: 'design', name: 'Designer', emoji: '🎨', color: '#ff006e', floor: '#ffd1e6', does: 'UX and UI design: flows, layouts, design systems and specs', desks: ['desk-13', 'desk-14'] },
-  scrum: { id: 'scrum', name: 'Scrum Master', emoji: '🏃', color: '#e9a100', floor: '#fdeebb', does: 'Runs the sprint: the board, stand-ups, blockers and retros', desks: ['desk-15', 'desk-16'] },
+  backend: dept('backend', 'Backend', '⚙️', '#3a86ff', '#d3e3ff', 'Servers, APIs, data and performance'),
+  frontend: dept('frontend', 'Frontend', '🖥️', '#fb8500', '#ffe3c2', 'The UI: pages, components, styles and accessibility'),
+  qa: dept('qa', 'QA', '🧪', '#2a9d8f', '#cdeee9', 'Writes and runs tests, reproduces bugs, checks that changes really work'),
+  security: dept('security', 'Security', '🛡️', '#e63946', '#fbd5d8', 'Finds and fixes vulnerabilities, reviews code, dependencies and privacy risks'),
+  devops: dept('devops', 'DevOps', '🚀', '#2b9348', '#d8f3dc', 'CI, builds, releases and runbooks; never touches a live server without the go-ahead'),
+  po: dept('po', 'Product Owner', '🧭', '#8338ec', '#e5d6fb', 'Turns needs into user stories with acceptance criteria, and keeps the backlog in order'),
+  design: dept('design', 'Designer', '🎨', '#ff006e', '#ffd1e6', 'UX and UI design: flows, layouts, design systems and specs'),
+  content: dept('content', 'Persian Content', '✍️', '#0096c7', '#caf0f8', 'Persian copy for messages, templates and the UI: tone, clarity and right-to-left text'),
+  docs: dept('docs', 'Technical Writer', '📚', '#8d6e63', '#efebe9', 'Keeps the README, plans, ADRs and guides true to what was built'),
+  techlead: dept('techlead', 'Tech Lead', '🏛️', '#1d3557', '#dbe4f0', 'Architecture and technical decisions: design reviews, ADRs and keeping the codebase coherent'),
 };
 
 export function isDepartmentId(v: unknown): v is DepartmentId {
   return typeof v === 'string' && (DEPARTMENT_IDS as readonly string[]).includes(v);
 }
 
-const BY_DESK = new Map<string, DepartmentDef>(Object.values(DEPARTMENTS).flatMap((d) => d.desks.map((id) => [id, d] as const)));
-
-/** The department a desk belongs to, if it's one of theirs. */
+/** The department a desk belongs to, if it's one of theirs (a hall desk, hall-<department>-<n>). */
 export function departmentOf(deskId: string | undefined): DepartmentDef | undefined {
-  return deskId ? BY_DESK.get(deskId) : undefined;
+  const m = deskId ? /^hall-([a-z]+)-\d+$/.exec(deskId) : null;
+  return m && isDepartmentId(m[1]) ? DEPARTMENTS[m[1]] : undefined;
 }
 
-/** A department by its id, or by its name as someone would say it ("security", "Product Owner", "design", "UX"). */
+/** A department by its id, or by its name as someone would say it ("security", "Product Owner", "UX", "l10n"). */
 export function findDepartment(raw: string): DepartmentDef | undefined {
-  const k = raw.trim().toLowerCase().replace(/[^a-z]/g, '');
+  const k = raw.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!k) return undefined;
-  const alias: Record<string, DepartmentId> = { sec: 'security', appsec: 'security', test: 'qa', testing: 'qa', tester: 'qa', be: 'backend', fe: 'frontend', ui: 'frontend', productowner: 'po', product: 'po', projectmanager: 'pm', manager: 'pm', designer: 'design', ux: 'design', scrummaster: 'scrum', agile: 'scrum' };
+  const alias: Record<string, DepartmentId> = {
+    be: 'backend',
+    fe: 'frontend',
+    ui: 'frontend',
+    test: 'qa',
+    testing: 'qa',
+    tester: 'qa',
+    sec: 'security',
+    appsec: 'security',
+    privacy: 'security',
+    compliance: 'security',
+    ops: 'devops',
+    release: 'devops',
+    ci: 'devops',
+    sre: 'devops',
+    infra: 'devops',
+    productowner: 'po',
+    product: 'po',
+    designer: 'design',
+    ux: 'design',
+    copy: 'content',
+    copywriter: 'content',
+    persian: 'content',
+    farsi: 'content',
+    localization: 'content',
+    l10n: 'content',
+    i18n: 'content',
+    translation: 'content',
+    documentation: 'docs',
+    writer: 'docs',
+    technicalwriter: 'docs',
+    techwriter: 'docs',
+    tech: 'techlead',
+    lead: 'techlead',
+    architect: 'techlead',
+    architecture: 'techlead',
+  };
   return Object.values(DEPARTMENTS).find((d) => d.id === k || d.name.toLowerCase().replace(/[^a-z]/g, '') === k) ?? (alias[k] ? DEPARTMENTS[alias[k]] : undefined);
 }
 
-// ---- The rooms ----------------------------------------------------------------------------------
+// ---- The rooms' glass ---------------------------------------------------------------------------
 
-/** How high a room's glass goes: well under the ceiling, so the office stays one big space. */
+/** How high a room's glass goes: under the ceiling, so its name over the door and the hall stay in view. */
 export const ROOM_HEIGHT = 2.6;
-/** How wide its door is, in the middle of the wall behind its chairs. */
+/** How wide its door is. */
 export const ROOM_DOOR = 1.5;
-/** How far a room reaches out to either side of its desks: as wide as the rug under them. */
-const SIDE = 0.9;
-/** How far behind its chairs its door wall is: room to walk up behind the workers. */
-const BEHIND = 2.6;
-
-/** A department's room, axis-aligned: the spine between the back-to-back desks on one side, the door on the other. */
-export interface RoomDef {
-  dept: DepartmentDef;
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
-  /** The wall the desks stand back to back against (shared with the room on its other side), and the one with the door: z values. */
-  spineZ: number;
-  doorZ: number;
-  /** Which way out of the door is: +1 toward +z, -1 toward -z. */
-  out: 1 | -1;
-}
-
-function room(dept: DepartmentDef): RoomDef {
-  const desks = dept.desks.map((id) => DESKS.find((d) => d.id === id)!) as [DeskDef, DeskDef];
-  const hw = DESK_SIZE.width / 2;
-  const minX = Math.min(...desks.map((d) => d.x)) - hw - SIDE;
-  const maxX = Math.max(...desks.map((d) => d.x)) + hw + SIDE;
-  // The workers sit on the side away from the spine; the room goes past them to its door.
-  const seat = deskSeat(desks[0]);
-  const out = seat.z > desks[0].z ? 1 : -1;
-  const spineZ = desks[0].z - (out * DESK_SIZE.depth) / 2;
-  const doorZ = seat.z + out * (BEHIND - 0.85);
-  return { dept, minX, maxX, minZ: Math.min(spineZ, doorZ), maxZ: Math.max(spineZ, doorZ), spineZ, doorZ, out };
-}
-
-export const ROOMS: readonly RoomDef[] = Object.values(DEPARTMENTS).map(room);
-
-/** The door's middle, on its wall. */
-export function roomDoor(r: RoomDef): { x: number; z: number } {
-  return { x: (r.minX + r.maxX) / 2, z: r.doorZ };
-}
-
-/**
- * Where its kit stands (a server rack, a board, an easel): in the end of the room away from the next
- * room along the row, between the desks' spine and the door. `facing` is the way it faces, rotation
- * about y, toward the desks.
- */
-export function roomKit(r: RoomDef): { x: number; z: number; facing: number; half: number } {
-  const west = r.minX < -6;
-  return { x: west ? r.minX + 0.5 : r.maxX - 0.5, z: (r.spineZ + r.doorZ) / 2, facing: west ? Math.PI / 2 : -Math.PI / 2, half: 0.36 };
-}
-
-/**
- * The room's walls as thin rectangles (minX, maxX, minZ, maxZ), with its door left open: what the
- * dog and the workers walking about steer round (shared/nav.ts), as the 3D walls stand.
- */
-export function roomWalls(r: RoomDef, t = 0.1): [number, number, number, number][] {
-  const dx = (r.minX + r.maxX) / 2;
-  const half = ROOM_DOOR / 2;
-  return [
-    [r.minX - t / 2, r.minX + t / 2, r.minZ, r.maxZ],
-    [r.maxX - t / 2, r.maxX + t / 2, r.minZ, r.maxZ],
-    [r.minX, dx - half, r.doorZ - t / 2, r.doorZ + t / 2],
-    [dx + half, r.maxX, r.doorZ - t / 2, r.doorZ + t / 2],
-    [r.minX, r.maxX, r.spineZ - t / 2, r.spineZ + t / 2],
-  ];
-}
 
 // ---- The Manager's booth ------------------------------------------------------------------------
 

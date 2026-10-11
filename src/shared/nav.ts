@@ -4,7 +4,7 @@
 // An office floor built out into the back office (see WING) has more of it to get round: the office's
 // helpers take how many rows it's built out (`wing`), and each level gets a grid of its own.
 
-import { MANAGER_BOOTH, ROOMS, boothWalls, roomKit, roomWalls } from './departments.js';
+import { MANAGER_BOOTH, boothWalls } from './departments.js';
 import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, JUKEBOX, KIOSK, LADDER, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PARACHUTE, POLE, POLES, ROAD, STAIRS, STATIONS, WHITEBOARD, WING, builtDesks, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
 
 
@@ -54,15 +54,9 @@ function obstacles(wing: number): Obstacles {
     const [cx, cz] = deskPoint(d, 0, 0.9);
     circles.push([cx, cz, 0.35]); // the chair
   }
-  // The departments' glass rooms round the desks, their doors left open (see shared/departments.ts).
-  // And the Manager's booth round its kiosk.
+  // The Manager's booth round its kiosk (see shared/departments.ts).
   rects.push(...boothWalls());
   for (const [x, z] of MANAGER_BOOTH.plants) circles.push([x, z, 0.27]);
-  for (const r of ROOMS) {
-    rects.push(...roomWalls(r));
-    const kit = roomKit(r);
-    rects.push([kit.x - kit.half, kit.x + kit.half, kit.z - kit.half, kit.z + kit.half]);
-  }
   rects.push([10, 11, -2.2, 2.2]); // couch
   rects.push([12.2, 13.8, -0.8, 0.8]); // coffee table
   circles.push([12.5, 3.5, 0.5], [14.5, -3.4, 0.5]); // beanbags

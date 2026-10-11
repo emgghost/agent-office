@@ -1,3 +1,4 @@
+import { inHall } from '../shared/hall-plan.js';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -172,7 +173,8 @@ export class Floor {
     // Before the workers, so it hears about the ones who wake up needing input.
     this.dog = new Dog(def.id, dataDir, {
       workers: () => this.workers?.list() ?? [],
-      people: () => ctx.peers(this),
+      // Nobody up the lift in the Departments hall: the dog keeps to the office.
+      people: () => ctx.peers(this).filter((p) => !inHall(p.x, p.z)),
       send: (dog) => ctx.emit(this, { t: 'dog', dog }),
       wing: () => this.plan.wing,
     });

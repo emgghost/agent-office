@@ -3,6 +3,7 @@
  * has you come in, up on its throne; and where you're standing, to come back to.
  */
 import { ELEVATOR, ELEVATOR_CAR, FLOOR, POLE, SLAB, STOREY, WALL_HEIGHT, inElevator, inWing } from '../../shared/layout';
+import { HALL_LIFT, inHall } from '../../shared/hall-plan';
 import { ROOF, ROOF_NAME } from '../../shared/rooftop';
 import type { Arrival } from '../features/climbing/controller';
 import { rememberSpot, store, type Spot } from '../state';
@@ -27,14 +28,26 @@ export function installPlace(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'worl
     return !core.upTop && player.pos.y < -SLAB - 1;
   }
 
+  /** In your floor's Departments hall, a lift ride from the office (see shared/hall-plan.ts). */
+  function inHallNow(): boolean {
+    return !core.upTop && inOffice() && inHall(player.pos.x, player.pos.z);
+  }
+
+  /** Out of the hall's lift, facing into the hall. */
+  function placeInHall() {
+    const at = HALL_LIFT.arrive;
+    placeAt({ x: at.x, y: 0, z: at.z, rotY: at.rotY });
+  }
+
   /**
-   * Inside the office on your floor, its back office as far as it's built out too: not out on the
-   * balcony, the fire escape, the street or the golf course across it, nor down in the garage.
+   * Inside the office on your floor, its back office as far as it's built out too, or in its
+   * Departments hall: not out on the balcony, the fire escape, the street or the golf course across
+   * it, nor down in the garage.
    */
   function indoors(): boolean {
     const p = player.pos;
     if (core.upTop || !inOffice() || p.y < -1 || p.y > WALL_HEIGHT) return false;
-    return (p.x > FLOOR.minX && p.x < FLOOR.maxX && p.z > FLOOR.minZ && p.z < FLOOR.maxZ) || inWing(p.x, p.z, parts.worlds.officeWing());
+    return (p.x > FLOOR.minX && p.x < FLOOR.maxX && p.z > FLOOR.minZ && p.z < FLOOR.maxZ) || inWing(p.x, p.z, parts.worlds.officeWing()) || inHall(p.x, p.z);
   }
 
   /** On your feet at `at`, facing `rotY` and looking straight ahead. */
@@ -113,5 +126,5 @@ export function installPlace(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'worl
     return !!id && player.seat?.seatId === id;
   }
 
-  return { placeInCar, downstairs, indoors, placeAt, spotHere, saveSpot, standingAt, unstick, placeAtSpawn, sitOnThrone, onThrone };
+  return { placeInCar, downstairs, inHallNow, placeInHall, indoors, placeAt, spotHere, saveSpot, standingAt, unstick, placeAtSpawn, sitOnThrone, onThrone };
 }

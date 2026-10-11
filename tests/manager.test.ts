@@ -3,7 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DESK_BY_ID, STATIONS, STATION_AGENT, deskSeat } from '../src/shared/layout.js';
-import { MANAGER_BOOTH, ROOMS, ROOM_DOOR, boothWalls } from '../src/shared/departments.js';
+import { MANAGER_BOOTH, ROOM_DOOR, boothWalls } from '../src/shared/departments.js';
+import { DESKS } from '../src/shared/layout.js';
 import { kioskCollider } from '../src/client/world/office/kiosk.js';
 import { FLOOR, LOFT, MEETING_ROOM, SPAWN, STAIRS, plantsAt } from '../src/shared/layout.js';
 import { route, walkable } from '../src/shared/nav.js';
@@ -22,7 +23,7 @@ test("the Manager has a desk of its own in the office, out in the open, with roo
   assert.equal(desk.station, 'manager');
   assert.deepEqual(STATION_AGENT.manager, { name: 'Manager', color: '#ffb703' });
   assert.equal(STATIONS.filter((s) => s.station === 'manager').length, 1);
-  for (const r of ROOMS) assert.ok(desk.x < r.minX - 1 || desk.x > r.maxX + 1 || desk.z < r.minZ - 1 || desk.z > r.maxZ + 1, `clear of ${r.dept.name}'s room`);
+  for (const d of DESKS) assert.ok(Math.hypot(desk.x - d.x, desk.z - d.z) > 4, `clear of ${d.id}`);
   // Where you stand to talk to it, in front of the kiosk, and where it stands, behind it.
   const front = { x: desk.x - Math.sin(desk.rotY) * 0.9, z: desk.z - Math.cos(desk.rotY) * 0.9 };
   assert.ok(walkable(front.x, front.z), 'open floor in front of it');
@@ -49,7 +50,7 @@ test("the Manager's brief: it runs the departments for its employer, and doesn't
   assert.match(brief, /^You're the Manager of this software company's office/);
   assert.match(brief, /you're the only one they talk to/);
   assert.match(brief, /You don't do the work yourself/);
-  for (const d of ['security', 'qa', 'backend', 'frontend', 'po', 'pm', 'design', 'scrum']) assert.match(brief, new RegExp(`- ${d}`));
+  for (const d of ['backend', 'frontend', 'qa', 'security', 'devops', 'po', 'design', 'content', 'docs', 'techlead']) assert.match(brief, new RegExp(`- ${d}`));
   assert.match(brief, /hire_worker with department/);
   assert.match(brief, /📣 report/);
   assert.match(brief, /permission prompt is waiting for your employer/);
@@ -61,8 +62,8 @@ test("the Manager's brief: it runs the departments for its employer, and doesn't
 test('a worker can be hired in a department, which picks the desk; not both', () => {
   const ok = readHireRequest({ prompt: 'Write the stories', department: 'Product Owner' }, ['claude']);
   assert.ok(typeof ok === 'object' && ok.department === 'po');
-  assert.match(readHireRequest({ prompt: 'x', department: 'accounting' }, ['claude']) as string, /department is one of security, qa/);
-  assert.equal(readHireRequest({ prompt: 'x', department: 'qa', desk: 'desk-3' }, ['claude']), 'Give desk or department, not both');
+  assert.match(readHireRequest({ prompt: 'x', department: 'accounting' }, ['claude']) as string, /department is one of backend, frontend, qa, security, devops/);
+  assert.equal(readHireRequest({ prompt: 'x', department: 'qa', desk: 'hall-qa-1' }, ['claude']), 'Give desk or department, not both');
   assert.deepEqual(parseArgs(['hire', '--department', 'qa', '--prompt', 'Test it']), { cmd: 'hire', json: false, prompt: 'Test it', department: 'qa' });
   const hire = TOOLS.find((x: { name: string }) => x.name === 'hire_worker');
   assert.ok(hire.inputSchema.properties.department.enum.includes('security'));
@@ -92,8 +93,8 @@ function floor(...ws: WorkerInfo[]) {
 
 test("the Manager hears when one of its workers finishes or needs a person, in one report, once it's free to take it", async () => {
   const boss = worker('boss', MANAGER_DESK, 'idle');
-  const bolt = worker('bolt', 'desk-5', 'working', { via: 'manager', task: { name: 'Reset Endpoint', summary: 'Adding the password reset API' } });
-  const pip = worker('pip', 'desk-3', 'working', { via: 'manager', prompt: 'Test the reset flow' });
+  const bolt = worker('bolt', 'hall-backend-1', 'working', { via: 'manager', task: { name: 'Reset Endpoint', summary: 'Adding the password reset API' } });
+  const pip = worker('pip', 'hall-qa-3', 'working', { via: 'manager', prompt: 'Test the reset flow' });
   const other = worker('ada', 'desk-17', 'working');
   const f = floor(boss, bolt, pip, other);
   for (const w of [boss, bolt, pip, other]) f.reports.onWorker(w);
@@ -122,7 +123,7 @@ test("the Manager hears when one of its workers finishes or needs a person, in o
 
 test('a Manager in the middle of a question of its own hears later; a stopped one is woken with it; none, and it goes unsaid', async () => {
   const boss = worker('boss', MANAGER_DESK, 'needs_input');
-  const bolt = worker('bolt', 'desk-5', 'working', { via: 'manager' });
+  const bolt = worker('bolt', 'hall-backend-2', 'working', { via: 'manager' });
   const f = floor(boss, bolt);
   f.reports.onWorker(boss);
   f.reports.onWorker(bolt);
@@ -181,7 +182,7 @@ test("the Manager's booth is round its kiosk, with room inside, its door toward 
   assert.ok(b.maxZ < STAIRS.minZ - 0.5);
   assert.ok(!inside(SPAWN.x, SPAWN.z, -0.6), 'not where people arrive');
   for (const [x, z] of plantsAt(0)) assert.ok(!inside(x, z, -0.5), `the plant at (${x}, ${z})`);
-  for (const r of ROOMS) assert.ok(b.minX > r.maxX + 1 || b.maxX < r.minX - 1 || b.minZ > r.maxZ + 1 || b.maxZ < r.minZ - 1, `${r.dept.name}'s room`);
+  for (const d of DESKS) assert.ok(d.x < b.minX - 1.5 || d.x > b.maxX + 1.5 || d.z < b.minZ - 1.5 || d.z > b.maxZ + 1.5, `${d.id}`);
   // In through the door, never the glass.
   const way = route([0, 0], [front.x, front.z]);
   const glass = boothWalls(0.02);

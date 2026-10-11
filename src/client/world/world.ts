@@ -1,3 +1,5 @@
+import { HALL, HALL_BOUNDS, isHallDesk } from '../../shared/hall-plan';
+import { hallWayHome, hallWayIn } from '../../shared/hall';
 import type * as THREE from 'three';
 import type { FloorPalette } from '../../shared/floors';
 import { LOFT, WALL_HEIGHT, WALL_T, FLOOR, type DeskDef } from '../../shared/layout';
@@ -112,12 +114,14 @@ export function officeWorld(office: Office, upstairs: () => boolean, wing: () =>
       return officeNav(wing());
     },
     ways: {
-      home: (seat) => (upstairs() ? { way: wayToBalcony(seat, wing()), chute: true } : { way: wayHome(seat, wing()), chute: false }),
-      in: (seat) => wayIn(seat, wing()),
+      // The Departments hall's desks come and go by its lift (see shared/hall.ts).
+      home: (seat, from) => (isHallDesk(seat.id) ? { way: hallWayHome(seat, from), chute: false } : upstairs() ? { way: wayToBalcony(seat, wing()), chute: true } : { way: wayHome(seat, wing()), chute: false }),
+      in: (seat) => (isHallDesk(seat.id) ? hallWayIn(seat) : wayIn(seat, wing())),
     },
     rain: [
       { area: FLOOR, top: ceilingOver },
       { area: LOFT, top: () => LOFT.y + LOFT.height - 0.1 },
+      { area: HALL_BOUNDS, top: () => HALL.height },
     ],
     device: 'laptop',
     room: { wall: WALL_T, enclosed: false },
