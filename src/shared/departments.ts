@@ -23,31 +23,34 @@ export interface DepartmentDef {
   floor: string;
   /** What it does, in a line: the hire window and the department list say it. */
   does: string;
+  /** The model assigned by default when hiring in this department. */
+  defaultModel: string;
   /** Its desks in the hall (hall-plan.ts names them the same way). */
   desks: readonly string[];
 }
 
-const dept = (id: DepartmentId, name: string, emoji: string, color: string, floor: string, does: string): DepartmentDef => ({
+const dept = (id: DepartmentId, name: string, emoji: string, color: string, floor: string, does: string, defaultModel: string): DepartmentDef => ({
   id,
   name,
   emoji,
   color,
   floor,
   does,
+  defaultModel,
   desks: Array.from({ length: DEPARTMENT_SEATS }, (_, i) => `hall-${id}-${i + 1}`),
 });
 
 export const DEPARTMENTS: Record<DepartmentId, DepartmentDef> = {
-  backend: dept('backend', 'Backend', '⚙️', '#3a86ff', '#d3e3ff', 'Servers, APIs, data and performance'),
-  frontend: dept('frontend', 'Frontend', '🖥️', '#fb8500', '#ffe3c2', 'The UI: pages, components, styles and accessibility'),
-  qa: dept('qa', 'QA', '🧪', '#2a9d8f', '#cdeee9', 'Writes and runs tests, reproduces bugs, checks that changes really work'),
-  security: dept('security', 'Security', '🛡️', '#e63946', '#fbd5d8', 'Finds and fixes vulnerabilities, reviews code, dependencies and privacy risks'),
-  devops: dept('devops', 'DevOps', '🚀', '#2b9348', '#d8f3dc', 'CI, builds, releases and runbooks; never touches a live server without the go-ahead'),
-  po: dept('po', 'Product Owner', '🧭', '#8338ec', '#e5d6fb', 'Turns needs into user stories with acceptance criteria, and keeps the backlog in order'),
-  design: dept('design', 'Designer', '🎨', '#ff006e', '#ffd1e6', 'UX and UI design: flows, layouts, design systems and specs'),
-  content: dept('content', 'Persian Content', '✍️', '#0096c7', '#caf0f8', 'Persian copy for messages, templates and the UI: tone, clarity and right-to-left text'),
-  docs: dept('docs', 'Technical Writer', '📚', '#8d6e63', '#efebe9', 'Keeps the README, plans, ADRs and guides true to what was built'),
-  techlead: dept('techlead', 'Tech Lead', '🏛️', '#1d3557', '#dbe4f0', 'Architecture and technical decisions: design reviews, ADRs and keeping the codebase coherent'),
+  backend: dept('backend', 'Backend', '⚙️', '#3a86ff', '#d3e3ff', 'Servers, APIs, data and performance', 'ag/gemini-3.8-flash-high'),
+  frontend: dept('frontend', 'Frontend', '🖥️', '#fb8500', '#ffe3c2', 'The UI: pages, components, styles and accessibility', 'ag/gemini-3.8-flash-high'),
+  qa: dept('qa', 'QA', '🧪', '#2a9d8f', '#cdeee9', 'Writes and runs tests, reproduces bugs, checks that changes really work', 'ag/gemini-3.8-flash-high'),
+  security: dept('security', 'Security', '🛡️', '#e63946', '#fbd5d8', 'Finds and fixes vulnerabilities, reviews code, dependencies and privacy risks', 'ag/gemini-pro-agent'),
+  devops: dept('devops', 'DevOps', '🚀', '#2b9348', '#d8f3dc', 'CI, builds, releases and runbooks; never touches a live server without the go-ahead', 'ag/gemini-3.8-flash-medium'),
+  po: dept('po', 'Product Owner', '🧭', '#8338ec', '#e5d6fb', 'Turns needs into user stories with acceptance criteria, and keeps the backlog in order', 'ag/gemini-3.8-flash-medium'),
+  design: dept('design', 'Designer', '🎨', '#ff006e', '#ffd1e6', 'UX and UI design: flows, layouts, design systems and specs', 'ag/gemini-3.8-flash-medium'),
+  content: dept('content', 'Persian Content', '✍️', '#0096c7', '#caf0f8', 'Persian copy for messages, templates and the UI: tone, clarity and right-to-left text', 'ag/gemini-3.8-flash-low'),
+  docs: dept('docs', 'Technical Writer', '📚', '#8d6e63', '#efebe9', 'Keeps the README, plans, ADRs and guides true to what was built', 'ag/gemini-3.8-flash-low'),
+  techlead: dept('techlead', 'Tech Lead', '🏛️', '#1d3557', '#dbe4f0', 'Architecture and technical decisions: design reviews, ADRs and keeping the codebase coherent', 'ag/gemini-pro-agent'),
 };
 
 export function isDepartmentId(v: unknown): v is DepartmentId {

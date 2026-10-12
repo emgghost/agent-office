@@ -1,5 +1,7 @@
 import type { WorkerInfo } from '../shared/protocol.js';
 import { departmentOf, type DepartmentDef } from '../shared/departments.js';
+import type { AgentProvider } from '../shared/providers.js';
+import { validateWorkerModel } from './agents.js';
 import { officePrompt, type PromptSource } from './prompts.js';
 
 // The departments on the server (see shared/departments.ts): the role a worker at one of their desks
@@ -55,4 +57,23 @@ export function departmentWorker(workers: readonly WorkerInfo[], dept: Departmen
 /** A desk of `dept`'s nobody sits at, to hire someone at. */
 export function freeDepartmentDesk(dept: DepartmentDef, occupied: (deskId: string) => boolean): string | undefined {
   return dept.desks.find((id) => !occupied(id));
+}
+
+/**
+ * Resolves the model to use for a department worker. If an explicit model was provided, it is
+ * preserved. Otherwise, if the department defines a default model compatible with the provider,
+ * that model is returned; if incompatible with the provider, returns undefined so the provider's
+ * default is used.
+ */
+export function resolveDepartmentModel(
+  dept: DepartmentDef | undefined,
+  provider: AgentProvider | undefined,
+  explicitModel?: string,
+): string | undefined {
+  if (explicitModel !== undefined) return explicitModel;
+  if (!dept?.defaultModel) return undefined;
+  if (validateWorkerModel('agent', provider, dept.defaultModel) === undefined) {
+    return dept.defaultModel;
+  }
+  return undefined;
 }

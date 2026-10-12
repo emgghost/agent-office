@@ -5,20 +5,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { DEPARTMENTS, DEPARTMENT_IDS, DEPARTMENT_SEATS, ROOM_DOOR, departmentOf, findDepartment } from '../src/shared/departments.js';
+import { DEPARTMENTS, DEPARTMENT_IDS, DEPARTMENT_SEATS, ROOM_DOOR, type DepartmentId, departmentOf, findDepartment } from '../src/shared/departments.js';
 import { HALL, HALL_BOUNDS, HALL_CORRIDOR, HALL_DESKS, HALL_LIFT, HALL_LOBBY, HALL_ROOMS, inHall, isHallDesk } from '../src/shared/hall-plan.js';
 import { hallKit, hallNav, hallRoomWalls, hallWayHome, hallWayIn } from '../src/shared/hall.js';
 import { DESKS, DESK_BY_ID, SEATS, deskSeat } from '../src/shared/layout.js';
 import { PROMPTS, PROMPT_GROUPS } from '../src/shared/prompts.js';
-import { WAITING, departmentWorker, firstPrompt, freeDepartmentDesk, roleOf, withRole } from '../src/server/departments.js';
+import { WAITING, departmentWorker, firstPrompt, freeDepartmentDesk, resolveDepartmentModel, roleOf, withRole } from '../src/server/departments.js';
 import { Asks } from '../src/server/asks.js';
 import { officeAsks } from '../src/server/hooks/office-asks.js';
+import { officeWorkers } from '../src/server/hooks/office-workers.js';
+import type { AgentProvider } from '../src/shared/providers.js';
 import type { WorkerInfo, WorkerStatus } from '../src/shared/protocol.js';
 import type { PromptSource } from '../src/server/prompts.js';
 // @ts-expect-error plain JS, no types
 import { TOOLS, parseArgs } from '../bin/office-workers.js';
 
-const worker = (id: string, deskId: string, status: WorkerStatus = 'idle', kind: 'agent' | 'shell' = 'agent') => ({ id, name: id[0].toUpperCase() + id.slice(1), deskId, status, kind }) as WorkerInfo;
+const worker = (id: string, deskId: string, status: WorkerStatus = 'idle', kind: 'agent' | 'shell' = 'agent') => ({ id, name: id[0].toUpperCase() + id.slice(1), deskId, status, kind, createdAt: 0, viewers: [] }) as WorkerInfo;
 const inRoom = (x: number, z: number, r: (typeof HALL_ROOMS)[number], m = 0) => x > r.minX - m && x < r.maxX + m && z > r.minZ - m && z < r.maxZ + m;
 
 test('ten departments, four desks each in the Departments hall, and the office’s own desks are anyone’s', () => {
@@ -134,7 +136,7 @@ test('who in a department takes a question: the readiest one there, never the on
 test('asking a department finds someone there, or hires someone at a free desk of its in the hall for the question', async (t) => {
   const all = new Map<string, WorkerInfo>();
   const typed: [string, string][] = [];
-  const spawned: { desk: string; prompt?: string }[] = [];
+  const spawned: { desk: string; prompt?: string; provider?: AgentProvider; model?: string }[] = [];
   const toasts: string[] = [];
   const asks = new Asks({ get: (id) => all.get(id), prompt: (id, text) => void typed.push([id, text]), resume: () => undefined }, undefined, (text) => toasts.push(text));
   const me = worker('mochi', 'desk-17');
@@ -146,8 +148,9 @@ test('asking a department finds someone there, or hires someone at a free desk o
       authenticate: (id: string, token: string) => (token === 'tok' ? all.get(id) : undefined),
       deskOccupied: (desk: string) => [...all.values()].some((w) => w.deskId === desk),
       ownerOf: () => undefined,
-      spawn(desk: string, _by: string, prompt?: string) {
-        spawned.push({ desk, prompt });
+      officeDefault: { provider: 'pi' as AgentProvider },
+      spawn(desk: string, _by: string, prompt?: string, _wt = false, _kind = 'agent', provider?: AgentProvider, model?: string) {
+        spawned.push({ desk, prompt, provider, model });
         const w = { ...worker(`hire${spawned.length}`, desk, 'starting'), name: `Hire${spawned.length}` };
         all.set(w.id, w);
         return w;
@@ -164,6 +167,8 @@ test('asking a department finds someone there, or hires someone at a free desk o
   const first = await (await ask({ department: 'security', question: 'Is the session cookie HttpOnly?' })).json();
   assert.equal(spawned.length, 1);
   assert.equal(spawned[0].desk, 'hall-security-1');
+  assert.equal(spawned[0].provider, 'pi');
+  assert.equal(spawned[0].model, 'ag/gemini-pro-agent');
   assert.match(spawned[0].prompt!, /Mochi, another worker in this office, has a question for you/);
   assert.equal(first.question.to, 'Hire1');
   assert.equal(first.question.status, 'asked');
@@ -180,8 +185,130 @@ test('asking a department finds someone there, or hires someone at a free desk o
   for (let i = 1; i <= 4; i++) all.set(`s${i}`, worker(`s${i}`, `hall-qa-${i}`, 'idle', 'shell'));
   const full = await ask({ department: 'qa', question: 'Tests green?' });
   assert.equal(full.status, 409);
-  assert.match((await full.json()).error, /Nobody else in 🧪 QA can take a question/);
+  assert.equal((await full.json()).error, 'Nobody else in 🧪 QA can take a question, and all 4 of its desks are taken');
   assert.equal((await ask({ department: 'scrum', question: '?' })).status, 404, 'a department that went');
+});
+
+test('every department has its expected default model', () => {
+  const expected: Record<DepartmentId, string> = {
+    techlead: 'ag/gemini-pro-agent',
+    security: 'ag/gemini-pro-agent',
+    backend: 'ag/gemini-3.8-flash-high',
+    frontend: 'ag/gemini-3.8-flash-high',
+    qa: 'ag/gemini-3.8-flash-high',
+    po: 'ag/gemini-3.8-flash-medium',
+    design: 'ag/gemini-3.8-flash-medium',
+    devops: 'ag/gemini-3.8-flash-medium',
+    content: 'ag/gemini-3.8-flash-low',
+    docs: 'ag/gemini-3.8-flash-low',
+  };
+  for (const [id, model] of Object.entries(expected)) {
+    assert.equal(DEPARTMENTS[id as DepartmentId].defaultModel, model, `${id} default model`);
+  }
+});
+
+test('resolveDepartmentModel returns default model for compatible providers and undefined for incompatible providers', () => {
+  const backend = DEPARTMENTS.backend;
+  // Explicit model override is always respected
+  assert.equal(resolveDepartmentModel(backend, 'pi', 'custom/my-model'), 'custom/my-model');
+  assert.equal(resolveDepartmentModel(backend, 'claude', 'opus'), 'opus');
+
+  // Compatible providers: pi, opencode, codex
+  assert.equal(resolveDepartmentModel(backend, 'pi'), 'ag/gemini-3.8-flash-high');
+  assert.equal(resolveDepartmentModel(backend, 'opencode'), 'ag/gemini-3.8-flash-high');
+  assert.equal(resolveDepartmentModel(backend, 'codex'), 'ag/gemini-3.8-flash-high');
+
+  // Incompatible providers: claude (only accepts fable, opus, sonnet, haiku), custom
+  assert.equal(resolveDepartmentModel(backend, 'claude'), undefined);
+  assert.equal(resolveDepartmentModel(backend, 'custom'), undefined);
+
+  // Undefined department or provider
+  assert.equal(resolveDepartmentModel(undefined, 'pi'), undefined);
+  assert.equal(resolveDepartmentModel(backend, undefined), undefined);
+});
+
+test('hiring a worker auto-assigns the department default model unless overridden, and respects provider compatibility', async (t) => {
+  const all = new Map<string, WorkerInfo>();
+  const spawned: { desk: string; provider?: AgentProvider; model?: string }[] = [];
+  const me = worker('mochi', 'desk-17');
+  all.set(me.id, me);
+
+  let currentDefaultProvider: AgentProvider = 'pi';
+  const floor = {
+    id: 'fl-1',
+    def: { name: 'main', repo: 'test/repo' },
+    project: { branch: 'main', agentProviders: ['pi', 'claude', 'opencode', 'codex'] as AgentProvider[] },
+    plan: { wing: false },
+    github: { pulls: { items: [] } },
+    queue: { state: () => ({ tasks: [] }), dropIssue: () => {} },
+    workers: {
+      get: (id: string) => all.get(id),
+      list: () => [...all.values()],
+      authenticate: (id: string, token: string) => (token === 'tok' ? all.get(id) : undefined),
+      deskOccupied: (desk: string) => [...all.values()].some((w) => w.deskId === desk),
+      ownerOf: () => undefined,
+      fetchBase: async () => {},
+      get officeDefault() {
+        return { provider: currentDefaultProvider };
+      },
+      spawn(desk: string, _by: string, _prompt?: string, _worktree = false, _kind = 'agent', provider?: AgentProvider, model?: string) {
+        spawned.push({ desk, provider, model });
+        const w = { ...worker(`h${spawned.length}`, desk, 'working'), name: `Worker${spawned.length}` };
+        all.set(w.id, w);
+        return w;
+      },
+    },
+  };
+  const ctx = {
+    workerFloor: () => floor,
+    toastFloor: () => {},
+    floors: new Map([[floor.id, floor]]),
+    ledger: { hiringPaused: undefined },
+    leaveOnMerge: { on: false },
+  } as any;
+
+  const server = http.createServer((req, res) => void officeWorkers(ctx, req, res, new URL(req.url ?? '/', 'http://127.0.0.1')));
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/office/workers?worker=mochi`;
+  const hire = (body: unknown) => fetch(base, { method: 'POST', headers: { authorization: 'Bearer tok' }, body: JSON.stringify(body) });
+
+  // 1. Hiring in backend without model: default model ag/gemini-3.8-flash-high assigned with pi
+  currentDefaultProvider = 'pi';
+  const res1 = await (await hire({ prompt: 'Build API', department: 'backend' })).json();
+  assert.equal(res1.ok, true);
+  assert.equal(spawned.at(-1)?.desk, 'hall-backend-1');
+  assert.equal(spawned.at(-1)?.provider, 'pi');
+  assert.equal(spawned.at(-1)?.model, 'ag/gemini-3.8-flash-high');
+
+  // 2. Hiring in backend with explicit model: explicit override respected
+  const res2 = await (await hire({ prompt: 'Build API', department: 'backend', model: 'custom-model' })).json();
+  assert.equal(res2.ok, true);
+  assert.equal(spawned.at(-1)?.desk, 'hall-backend-2');
+  assert.equal(spawned.at(-1)?.provider, 'pi');
+  assert.equal(spawned.at(-1)?.model, 'custom-model');
+
+  // 3. Hiring at a department desk directly (hall-techlead-1): department default model assigned
+  const res3 = await (await hire({ prompt: 'Architecture review', desk: 'hall-techlead-1' })).json();
+  assert.equal(res3.ok, true);
+  assert.equal(spawned.at(-1)?.desk, 'hall-techlead-1');
+  assert.equal(spawned.at(-1)?.provider, 'pi');
+  assert.equal(spawned.at(-1)?.model, 'ag/gemini-pro-agent');
+
+  // 4. Incompatible provider (claude): default model not compatible, so falls back to undefined
+  currentDefaultProvider = 'claude';
+  const res4 = await (await hire({ prompt: 'Secure API', department: 'security' })).json();
+  assert.equal(res4.ok, true);
+  assert.equal(spawned.at(-1)?.desk, 'hall-security-1');
+  assert.equal(spawned.at(-1)?.model, undefined);
+  assert.equal(spawned.at(-1)?.provider, undefined);
+
+  // 5. Incompatible provider (claude) with explicit model (haiku): explicit model accepted
+  const res5 = await (await hire({ prompt: 'Docs review', department: 'docs', model: 'haiku' })).json();
+  assert.equal(res5.ok, true);
+  assert.equal(spawned.at(-1)?.desk, 'hall-docs-1');
+  assert.equal(spawned.at(-1)?.model, 'haiku');
+  assert.equal(spawned.at(-1)?.provider, 'claude');
 });
 
 test('the command and the MCP tools take the ten departments', () => {

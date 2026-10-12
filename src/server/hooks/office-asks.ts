@@ -2,8 +2,8 @@ import { hiredVia } from '../manager.js';
 import type http from 'node:http';
 import { ANSWER_MAX, QUESTION_MAX, WAIT_MS, type Ask } from '../asks.js';
 import { findWorker } from '../office-workers.js';
-import { departmentWorker, freeDepartmentDesk } from '../departments.js';
-import { DEPARTMENT_IDS, findDepartment } from '../../shared/departments.js';
+import { departmentWorker, freeDepartmentDesk, resolveDepartmentModel } from '../departments.js';
+import { DEPARTMENT_IDS, DEPARTMENTS, findDepartment } from '../../shared/departments.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
@@ -54,11 +54,14 @@ export async function officeAsks(ctx: Ctx, req: http.IncomingMessage, res: http.
     if (!dept) return send(res, 404, { error: `No department called ${str(body.department, 40)} (there's ${DEPARTMENT_IDS.join(', ')})` });
     const there = departmentWorker(floor.workers.list(), dept, me.id);
     const desk = there ? undefined : freeDepartmentDesk(dept, (id) => floor.workers.deskOccupied(id));
-    if (!there && !desk) return send(res, 409, { error: `Nobody else in ${dept.emoji} ${dept.name} can take a question, and both its desks are taken` });
+    if (!there && !desk) return send(res, 409, { error: `Nobody else in ${dept.emoji} ${dept.name} can take a question, and all ${dept.desks.length} of its desks are taken` });
     asked = there
       ? floor.asks.ask(me, there, question)
       : floor.asks.askHiring(me, question, (prompt) => {
-          const hired = floor.workers.spawn(desk!, me.name, prompt, false, 'agent', undefined, undefined, undefined, undefined, floor.workers.ownerOf(me.id), [], hiredVia(me));
+          const target = DEPARTMENTS[dept.id];
+          const model = resolveDepartmentModel(target, floor.workers.officeDefault?.provider);
+          const provider = model ? floor.workers.officeDefault?.provider : undefined;
+          const hired = floor.workers.spawn(desk!, me.name, prompt, false, 'agent', provider, model, undefined, undefined, floor.workers.ownerOf(me.id), [], hiredVia(me));
           if (typeof hired !== 'string') ctx.toastFloor(floor, `${dept.emoji} ${me.name} hired ${hired.name} in ${dept.name} to answer a question`);
           return hired;
         });
