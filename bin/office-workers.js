@@ -22,7 +22,9 @@ const USAGE = `Usage:
                                                 --no-worktree --department <name> (backend,
                                                 frontend, qa, security, devops, po, design,
                                                 content, docs, techlead: a free desk of that
-                                                department in the Departments hall, and its role)
+                                                department in the Departments hall; auto-assigns
+                                                its role and default model unless --model is
+                                                specified)
   office-workers home <name|id>... [--cleanup auto|keep|worktree|all]
                                                 send workers home. auto (the default) deletes each
                                                 one's worktree and branch unless they hold work
@@ -390,14 +392,14 @@ export const TOOLS = [
       properties: {
         prompt: { type: 'string', description: 'The task, complete on its own.' },
         provider: { type: 'string', description: "Which agent runs it (claude, codex, opencode...; list_workers' providers). Default: the office's." },
-        model: { type: 'string', description: "A model for it, instead of the provider's default." },
+        model: { type: 'string', description: "A model for it, instead of the provider's or department's default." },
         effort: { type: 'string', enum: EFFORTS, description: 'Reasoning effort, for agents that take one.' },
         worktree: { type: 'boolean', description: 'Its own git worktree and branch (default true in a git checkout).' },
         desk: { type: 'string', description: 'A desk or bean bag id (desk-3). Default: the next free one.' },
         department: {
           type: 'string',
           enum: ['backend', 'frontend', 'qa', 'security', 'devops', 'po', 'design', 'content', 'docs', 'techlead'],
-          description: "Hire it in a department instead of naming a desk: at a free desk of that department's, where it starts in the department's role.",
+          description: "Hire it in a department instead of naming a desk: at a free desk of that department's; auto-assigns the department's role and default model unless model is specified.",
         },
         issue: { type: 'integer', minimum: 1, description: 'The GitHub issue it works on, assigned when it starts.' },
       },
